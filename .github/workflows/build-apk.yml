@@ -1,0 +1,71 @@
+name: Build AstroEmpire APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "AstroEmpire_Android_Project.zip"
+      - ".github/workflows/build-apk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Extract Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p extracted-project
+          unzip -q AstroEmpire_Android_Project.zip -d extracted-project
+
+          SETTINGS_FILE="$(find extracted-project -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "Android project not found"
+            exit 1
+          fi
+
+          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug
+          else
+            gradle assembleDebug
+          fi
+
+      - name: Find APK
+        shell: bash
+        run: |
+          APK="$(find "$PROJECT_DIR" -type f -name "*.apk" -print -quit)"
+          cp "$APK" AstroEmpire.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AstroEmpire-APK
+          path: AstroEmpire.apk
