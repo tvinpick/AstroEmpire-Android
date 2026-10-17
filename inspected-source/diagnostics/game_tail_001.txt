@@ -1,0 +1,4946 @@
+urn;
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden','true');
+}
+const contextTutorialClose = document.getElementById('contextTutorialClose');
+const contextTutorialOverlay = document.getElementById('contextTutorialOverlay');
+if(contextTutorialClose) contextTutorialClose.addEventListener('click',closeContextTutorial);
+if(contextTutorialOverlay) contextTutorialOverlay.addEventListener('pointerdown',e=>{
+  if(e.target === contextTutorialOverlay) closeContextTutorial();
+  else e.stopPropagation();
+});
+try{
+  resourceBarCollapsed = localStorage.getItem('astro_resource_bar_collapsed') === '1';
+}catch(e){}
+
+function applyResourceBarCollapsedState(){
+  if(!selectedPlanetResourceBar || !resourceBarToggle) return;
+  selectedPlanetResourceBar.classList.toggle('resourceBarCollapsed', resourceBarCollapsed);
+  resourceBarToggle.textContent = resourceBarCollapsed ? '＋' : '−';
+  const label = resourceBarCollapsed ? 'Развернуть панель ресурсов' : 'Свернуть панель ресурсов';
+  resourceBarToggle.setAttribute('aria-label', label);
+  resourceBarToggle.title = label;
+}
+
+if(resourceBarToggle){
+  resourceBarToggle.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    resourceBarCollapsed = !resourceBarCollapsed;
+    applyResourceBarCollapsedState();
+    try{
+      localStorage.setItem('astro_resource_bar_collapsed', resourceBarCollapsed ? '1' : '0');
+    }catch(e){}
+  });
+}
+applyResourceBarCollapsedState();
+
+
+const MILITARY_SHIP_TYPES = new Set([
+  'interceptor',
+  'corvette',
+  'frigate',
+  'destroyer',
+  'cruiser',
+  'battleship',
+  'guardian',
+  'dreadnought',
+  'titan'
+]);
+
+function isMilitaryShipType(type){
+  return MILITARY_SHIP_TYPES.has(type);
+}
+
+const COMBAT_PROFILES = {
+  scout:{hp:28,damage:2,range:18,interval:1.6},
+  researchMiner:{hp:34,damage:1,range:16,interval:1.8},
+  repair:{hp:155,damage:1,range:15,interval:2.2},
+  interceptor:{hp:70,damage:9,range:22,interval:1.0},
+  corvette:{hp:120,damage:13,range:24,interval:1.15},
+  frigate:{hp:175,damage:18,range:26,interval:1.25},
+  destroyer:{hp:290,damage:27,range:30,interval:1.35},
+  cruiser:{hp:470,damage:38,range:34,interval:1.45},
+  battleship:{hp:760,damage:54,range:38,interval:1.65},
+  guardian:{hp:340,damage:24,range:30,interval:1.4},
+  cargo:{hp:110,damage:2,range:15,interval:2.0},
+  colonizer:{hp:190,damage:2,range:15,interval:2.0},
+  dreadnought:{hp:1300,damage:78,range:43,interval:1.9},
+  titan:{hp:2300,damage:120,range:50,interval:2.2}
+};
+let x = 0, y = 0, scale = 1;
+let gameStarted = false;
+let gameSpeed = 1;
+let selectedScout = null;
+let selectedFleet = [];
+let infoSelectedShipIds = new Set();
+
+let fleetGroups = [];
+let fleetGroupSerial = 0;
+const FLEET_GROUP_NAMES = ['Альфа','Бета','Гамма','Дельта','Эпсилон','Омега','Сигма','Орион'];
+let fleetSelectionUnlockAt = 0;
+let researchQueue = null;
+const completedTechs = new Set();
+let pointCommandShips = [];
+let signalCommandShip = null;
+let panMoved = false;
+let lastFrameTime = performance.now();
+const scouts = [];
+const enemyVisitedPlanetIds = new Set();
+const enemyReservedPlanetIds = new Set();
+const MIN_SCALE = 0.55, MAX_SCALE = 1.8;
+let pan = false, panPointer = null, panStartX = 0, panStartY = 0, worldStartX = 0, worldStartY = 0;
+
+
+const DEFAULT_GAME_SETTINGS = {
+  gameSpeed:1,
+  graphics:'high',
+  effects:'normal',
+  fps:60,
+  uiAnimations:true,
+  powerSaver:false,
+  uiScale:1,
+  minimap:'normal',
+  hints:true,
+  actionHighlight:true,
+  patrolRanges:true,
+  cameraSpeed:'normal',
+  fog:true,
+  planetLabels:'known',
+  vibration:true,
+  eventSounds:true,
+  eventVolume:55,
+  autoSlow:false,
+  aiDifficulty:'normal',
+  aiPersonality:'balanced',
+  theme:'blue',
+  playerColor:'blue',
+  enemyColor:'red'
+};
+let gameSettings = {...DEFAULT_GAME_SETTINGS};
+let cameraPanFactor = 1;
+let eventAudioContext = null;
+let autoSlowTimer = null;
+let autoSlowPreviousSpeed = null;
+let fpsFrameGateAt = 0;
+
+const AI_DIFFICULTY = {
+  // peaceTime — минимальное игровое время развития до первой наступательной операции.
+  // earlyCombatCap — сколько боевых кораблей ИИ держит максимум во время стартовой фазы.
+  // attackFleetMin / attackWaveMax — минимальный и максимальный размер ударной группы.
+  // attackCooldown — пауза между наступательными волнами.
+  easy:{income:.72,buildSpeed:.80,combat:.82,move:.92,think:24,scoutDelay:12,aggression:.06,maxColonies:2,peaceTime:600,earlyCombatCap:1,attackFleetMin:4,attackWaveMax:4,attackCooldown:300},
+  normal:{income:1,buildSpeed:1,combat:1,move:1,think:16,scoutDelay:8,aggression:.13,maxColonies:3,peaceTime:480,earlyCombatCap:2,attackFleetMin:4,attackWaveMax:5,attackCooldown:240},
+  hard:{income:1.32,buildSpeed:1.22,combat:1.16,move:1.08,think:10,scoutDelay:6,aggression:.25,maxColonies:4,peaceTime:390,earlyCombatCap:2,attackFleetMin:4,attackWaveMax:6,attackCooldown:210},
+  aggressive:{income:1.18,buildSpeed:1.32,combat:1.28,move:1.13,think:7,scoutDelay:4.5,aggression:.46,maxColonies:4,peaceTime:300,earlyCombatCap:3,attackFleetMin:4,attackWaveMax:7,attackCooldown:180}
+};
+const enemyAIState = {thinkTimer:5,initialized:false,attackCooldown:0};
+
+function getAIProfile(){
+  return AI_DIFFICULTY[gameSettings.aiDifficulty] || AI_DIFFICULTY.normal;
+}
+function enemyScoutDecisionDelay(){
+  return getAIProfile().scoutDelay;
+}
+function shipMoveSpeed(ship){
+  const factor = ship?.owner === 'enemy' ? getAIProfile().move : 1;
+  return Math.max(.1,(ship?.speed || 1) * factor);
+}
+
+function rand(a,b){ return Math.random() * (b-a) + a; }
+function randi(a,b){ return Math.floor(rand(a,b+1)); }
+
+function drawNebulaBlob(ctx,x,y,radius,color,alpha=.16){
+  const g = ctx.createRadialGradient(x,y,0,x,y,radius);
+  g.addColorStop(0, color.replace('ALPHA', String(alpha)));
+  g.addColorStop(.45, color.replace('ALPHA', String(alpha*.45)));
+  g.addColorStop(1, color.replace('ALPHA','0'));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x,y,radius,0,Math.PI*2);
+  ctx.fill();
+}
+
+function drawDeepSpace(){
+  if(!deepSpaceCtx) return;
+
+  const ctx = deepSpaceCtx;
+  ctx.clearRect(0,0,WORLD_W,WORLD_H);
+
+  const bg = ctx.createLinearGradient(0,0,WORLD_W,WORLD_H);
+  bg.addColorStop(0,'#01030a');
+  bg.addColorStop(.35,'#030914');
+  bg.addColorStop(1,'#02050d');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0,0,WORLD_W,WORLD_H);
+
+  const nebulaScale = gameSettings.powerSaver
+    ? .7
+    : ({low:.8,medium:1,high:1.1,ultra:1.3}[gameSettings.graphics] || 1);
+
+  const blobs = [
+    [WORLD_W*.18,WORLD_H*.22,340*nebulaScale,'rgba(78,126,255,ALPHA)',.20],
+    [WORLD_W*.76,WORLD_H*.20,300*nebulaScale,'rgba(180,92,255,ALPHA)',.18],
+    [WORLD_W*.48,WORLD_H*.64,380*nebulaScale,'rgba(55,204,240,ALPHA)',.15],
+    [WORLD_W*.84,WORLD_H*.74,260*nebulaScale,'rgba(255,126,86,ALPHA)',.12],
+    [WORLD_W*.26,WORLD_H*.78,220*nebulaScale,'rgba(89,255,192,ALPHA)',.08]
+  ];
+  blobs.forEach(b => drawNebulaBlob(ctx,...b));
+
+  const dustCount = gameSettings.powerSaver
+    ? 70
+    : ({low:90,medium:150,high:220,ultra:280}[gameSettings.graphics] || 150);
+
+  for(let i=0;i<dustCount;i++){
+    const x = Math.random()*WORLD_W;
+    const y = Math.random()*WORLD_H;
+    const r = Math.random()*1.9 + .25;
+
+    ctx.fillStyle = Math.random() < .6
+      ? 'rgba(255,255,255,.12)'
+      : (Math.random()<.5
+          ? 'rgba(169,205,255,.10)'
+          : 'rgba(255,222,188,.10)');
+
+    ctx.beginPath();
+    ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  const streaks = gameSettings.powerSaver
+    ? 12
+    : ({low:14,medium:20,high:28,ultra:38}[gameSettings.graphics] || 20);
+
+  ctx.lineCap = 'round';
+
+  for(let i=0;i<streaks;i++){
+    const x = Math.random()*WORLD_W;
+    const y = Math.random()*WORLD_H;
+    const len = Math.random()*40 + 12;
+    const ang = (Math.random()*Math.PI/2) - Math.PI/4;
+
+    ctx.strokeStyle = 'rgba(255,255,255,.06)';
+    ctx.lineWidth = Math.random()*1.2 + .3;
+    ctx.beginPath();
+    ctx.moveTo(x,y);
+    ctx.lineTo(x + Math.cos(ang)*len, y + Math.sin(ang)*len);
+    ctx.stroke();
+  }
+}
+
+function buildStars(){
+  drawDeepSpace();
+  stars.innerHTML = '';
+  const colors = ['white','white','white','blue','warm'];
+  const tw = ['twinkle1','twinkle2','twinkle3'];
+  const starCount = gameSettings.powerSaver ? 130 : ({low:150,medium:250,high:360,ultra:520}[gameSettings.graphics] || 360);
+  for(let i=0;i<starCount;i++){
+    const s = document.createElement('span');
+    let size; const r = Math.random();
+    if(r < .56) size = rand(.8, 1.5); else if(r < .89) size = rand(1.5, 2.4); else size = rand(2.4, 3.7);
+    s.className = 'star ' + colors[Math.floor(Math.random()*colors.length)];
+    if(size > 2.1 || Math.random() < .2) s.classList.add('glow');
+    const twinkleChance = gameSettings.graphics === 'ultra' ? .20 : (gameSettings.graphics === 'high' ? .14 : .08); if(Math.random() < twinkleChance){ s.classList.add(tw[Math.floor(Math.random()*tw.length)]); s.style.animationDelay = '-' + rand(0,5).toFixed(2) + 's'; }
+    s.style.width = size + 'px'; s.style.height = size + 'px';
+    s.style.left = rand(0, WORLD_W-4) + 'px'; s.style.top = rand(0, WORLD_H-4) + 'px';
+    s.style.opacity = rand(.3,.95).toFixed(2);
+    stars.appendChild(s);
+  }
+}
+function circlesOverlap(a,b,pad=28){ return Math.hypot(a.x-b.x, a.y-b.y) < (a.r+b.r+pad); }
+const HABITABLE_STYLES = new Set(['earth_blue','earth_africa','blue_marble']);
+
+function createPlanet(x,y,r,styleKey,owner='neutral',name='Планета',rareOverride=null){
+  const isRare = rareOverride === null ? RARE_STYLES.has(styleKey) : rareOverride;
+  return {
+    x,y,r,styleKey,owner,name,
+    isRare,
+    isLarge:r>=LARGE_PLANET_RADIUS,
+    resources:assignPlanetResources(r,isRare),
+    population:0,
+    civilizationLevel: owner === 'neutral' ? 0 : 1,
+    habitable:HABITABLE_STYLES.has(styleKey),
+    playerScanned:owner !== 'neutral',
+    playerDiscoveredResources:[],
+    stockpile:{},
+    buildings:{
+      ironMine:0,copperMine:0,lithiumMine:0,
+      foodFarm:0,waterPlant:0,habitat:0,clinic:0,entertainment:0,securityCenter:0,
+      scienceCenter:0,
+      missileBattery:0,laserBattery:0,shipyard:owner === 'neutral' ? 0 : 1
+    },
+    upgrades:{
+      foodFarm:0,waterPlant:0,habitat:0,clinic:0,entertainment:0,securityCenter:0,
+      scienceCenter:0
+    },
+    upgradeQueues:{},
+    buildingQueues:{},
+    buildingQueue:null,
+    shipQueue:null,
+    captureState:null
+  };
+}
+function makeStartPlanets(){
+  const player = createPlanet(WORLD_W/2, WORLD_H-230, 28, 'earth_blue', 'player', 'Аврора Прайм', false);
+  player.resources = ['Железо','Медь','Литий'];
+  player.population = 1200;
+  player.civilizationLevel = 2;
+  player.habitable = true;
+  player.buildings.foodFarm = 2;
+  player.buildings.waterPlant = 2;
+  player.buildings.habitat = 3;
+  player.buildings.clinic = 1;
+  player.buildings.entertainment = 1;
+  player.buildings.securityCenter = 1;
+  player.playerDiscoveredResources = [...player.resources];
+  player.stockpile = {'Железо':560,'Медь':320,'Литий':220,'Алюминий':120};
+  const enemy = createPlanet(WORLD_W/2, 260, 28, 'red_marbled', 'enemy', 'Цитадель Оникс', false);
+  enemy.resources = ['Железо','Медь','Литий'];
+  enemy.population = 1200;
+  enemy.civilizationLevel = 2;
+  enemy.habitable = true;
+  enemy.buildings.foodFarm = 2;
+  enemy.buildings.waterPlant = 2;
+  enemy.buildings.habitat = 3;
+  enemy.buildings.clinic = 1;
+  enemy.buildings.entertainment = 1;
+  enemy.buildings.securityCenter = 1;
+  enemy.playerDiscoveredResources = [...enemy.resources];
+  enemy.stockpile = {'Железо':560,'Медь':320,'Литий':220,'Алюминий':120};
+  return [enemy, player];
+}
+function generateBalancedPlanets(){
+  const planets = [];
+  const starts = makeStartPlanets();
+  planets.push(...starts);
+
+  const allStyles = Object.keys(STYLE_DEFS);
+  const habitableStyles = [...HABITABLE_STYLES].filter(key => allStyles.includes(key));
+
+  function addNearbyColonizablePlanet(startPlanet, side){
+    // Гарантированная стартовая колония: близко, но не вплотную к базе.
+    // Координаты каждый раз немного отличаются, поэтому стартовые зоны не зеркальны.
+    for(let attempt=0; attempt<240; attempt++){
+      const styleKey = habitableStyles[randi(0, habitableStyles.length-1)];
+      const inwardAngle = side === 'player' ? -Math.PI/2 : Math.PI/2;
+      const angle = inwardAngle + rand(-0.72, 0.72);
+      const distance = rand(350, 470);
+      const px = startPlanet.x + Math.cos(angle) * distance;
+      const py = startPlanet.y + Math.sin(angle) * distance;
+
+      if(px < 180 || px > WORLD_W-180 || py < 220 || py > WORLD_H-220) continue;
+
+      const candidate = createPlanet(
+        px,
+        py,
+        rand(44, 54),
+        styleKey,
+        'neutral',
+        STYLE_DEFS[styleKey].title + ' — ближняя колония',
+        false
+      );
+      candidate.habitable = true;
+
+      let ok = true;
+      for(const existing of planets){
+        if(circlesOverlap(candidate, existing, 105)){ ok = false; break; }
+      }
+      if(ok){
+        planets.push(candidate);
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  // Симметрия только по возможностям, а не по координатам:
+  // у каждой стороны гарантированно одна пригодная для колонизации планета рядом со стартом.
+  addNearbyColonizablePlanet(starts[1], 'player');
+  addNearbyColonizablePlanet(starts[0], 'enemy');
+
+  let attempts = 0;
+  const targetTotalBeforeSpecials = 18;
+  while(planets.length < targetTotalBeforeSpecials && attempts < 12000){
+    attempts++;
+    const styleKey = allStyles[randi(0, allStyles.length-1)];
+    const x = rand(260, WORLD_W-260);
+    const y = rand(380, WORLD_H-380);
+    const r = rand(40, 72);
+    const candidate = createPlanet(x, y, r, styleKey, 'neutral', STYLE_DEFS[styleKey].title + ' ' + (planets.length-1));
+    let ok = true;
+    for(const existing of planets){
+      if(circlesOverlap(candidate, existing, 105)){ ok = false; break; }
+    }
+    if(!ok) continue;
+    const distPlayer = Math.hypot(candidate.x - starts[1].x, candidate.y - starts[1].y);
+    const distEnemy = Math.hypot(candidate.x - starts[0].x, candidate.y - starts[0].y);
+    // Стартовая зона зарезервирована под гарантированные объекты каждой стороны.
+    // Остальные планеты начинают появляться уже за её пределами.
+    if(distPlayer < 650 || distEnemy < 650) continue;
+    planets.push(candidate);
+  }
+
+  const specials = [
+    createPlanet(rand(620, 1040), rand(940, 1320), 62, 'cream_ringed', 'neutral', 'Кольцевая цитадель'),
+    createPlanet(rand(2050, 2580), rand(820, 1260), 58, 'galaxy_purple', 'neutral', 'Туманная сфера'),
+    createPlanet(rand(1220, 1700), rand(470, 860), 52, 'moon_gray', 'neutral', 'Лунная шахта'),
+    createPlanet(rand(1480, 2140), rand(1620, 2160), 52, 'iridescent', 'neutral', 'Переливчатое ядро')
+  ];
+  for(const sp of specials){
+    let safe = true;
+    for(const existing of planets){
+      if(circlesOverlap(sp, existing, 130)){ safe = false; break; }
+    }
+    if(safe) planets.push(sp);
+  }
+  return planets;
+}
+const planets = generateBalancedPlanets();
+planets.forEach((p,i) => p.id = 'planet-' + i);
+const playerPlanet = planets.find(p => p.owner === 'player');
+const enemyPlanet = planets.find(p => p.owner === 'enemy');
+const exploredAreas = [{x:playerPlanet.x, y:playerPlanet.y, r:520}];
+
+const researchAsteroids = [];
+
+function generateResearchAsteroids(){
+  function addNearbyStarterAsteroid(startPlanet, side){
+    // По одному гарантированному астероиду в стартовой зоне каждой стороны.
+    // Он находится достаточно близко для ранней добычи, но не перекрывает планеты.
+    for(let attempt=0; attempt<320; attempt++){
+      const inwardAngle = side === 'player' ? -Math.PI/2 : Math.PI/2;
+      const angle = inwardAngle + rand(-1.02, 1.02);
+      const distance = rand(270, 455);
+      const a = {
+        id:'asteroid-' + researchAsteroids.length,
+        kind:'researchAsteroid',
+        x:startPlanet.x + Math.cos(angle) * distance,
+        y:startPlanet.y + Math.sin(angle) * distance,
+        r:22,
+        name:'Астероид ' + (researchAsteroids.length+1),
+        playerScanned:true,
+        reserve:randi(300,520),
+        starterZone:side
+      };
+
+      if(a.x < 180 || a.x > WORLD_W-180 || a.y < 220 || a.y > WORLD_H-220) continue;
+
+      const farFromPlanets = planets.every(p => Math.hypot(a.x-p.x,a.y-p.y) > p.r + 145);
+      const farFromAsteroids = researchAsteroids.every(b => Math.hypot(a.x-b.x,a.y-b.y) > 230);
+      if(farFromPlanets && farFromAsteroids){
+        researchAsteroids.push(a);
+        return a;
+      }
+    }
+    return null;
+  }
+
+  // Равный старт: по одному астероиду рядом с игроком и противником.
+  addNearbyStarterAsteroid(playerPlanet, 'player');
+  addNearbyStarterAsteroid(enemyPlanet, 'enemy');
+
+  // Остальные астероиды по-прежнему распределяются хаотично по всей карте.
+  let tries = 0;
+  while(researchAsteroids.length < 8 && tries < 5000){
+    tries++;
+    const a = {
+      id:'asteroid-' + researchAsteroids.length,
+      kind:'researchAsteroid',
+      x:rand(250,WORLD_W-250),
+      y:rand(380,WORLD_H-380),
+      r:22,
+      name:'Астероид ' + (researchAsteroids.length+1),
+      playerScanned:true,
+      reserve:randi(260,520)
+    };
+
+    const farFromPlanets = planets.every(p => Math.hypot(a.x-p.x,a.y-p.y) > p.r + 170);
+    const farFromAsteroids = researchAsteroids.every(b => Math.hypot(a.x-b.x,a.y-b.y) > 260);
+    const outsideStarterZones =
+      Math.hypot(a.x-playerPlanet.x,a.y-playerPlanet.y) >= 650 &&
+      Math.hypot(a.x-enemyPlanet.x,a.y-enemyPlanet.y) >= 650;
+    if(farFromPlanets && farFromAsteroids && outsideStarterZones) researchAsteroids.push(a);
+  }
+}
+generateResearchAsteroids();
+
+function renderResearchAsteroids(){
+  asteroidLayer.innerHTML = '';
+  researchAsteroids.forEach(a => {
+    const wrap = document.createElement('div');
+    wrap.className = 'researchAsteroidWrap';
+    wrap.style.left = a.x + 'px';
+    wrap.style.top = a.y + 'px';
+
+    const core = document.createElement('div');
+    core.className = 'asteroidCore';
+
+    const rock = document.createElement('div');
+    rock.className = 'researchAsteroid';
+    rock.style.animationDuration = rand(28,48).toFixed(1) + 's';
+
+    const label = document.createElement('div');
+    label.className = 'asteroidLabel';
+    label.textContent = 'Астероид';
+
+    wrap.appendChild(core);
+    wrap.appendChild(rock);
+    wrap.appendChild(label);
+
+    wrap.addEventListener('pointerdown', e => {
+      if(!gameStarted) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      if(!isExploredPoint(a.x,a.y)){
+        scoutCommandHint.textContent = 'Этот астероид ещё не обнаружен разведкой.';
+        scoutCommandHint.classList.add('show');
+        setTimeout(() => scoutCommandHint.classList.remove('show'), 2200);
+        return;
+      }
+
+      if(!firstAsteroidTutorialShown && gameSettings.hints){
+        firstAsteroidTutorialShown = true;
+        showContextTutorial(
+          '☄️',
+          'Астероиды можно добывать',
+          'Для астероидов существует специальный корабль — <b>«Астероидный добытчик»</b>. Постройте его на своей колонии, выберите в списке флота и отправьте к астероиду. Он будет добывать <b>Ксенит</b>, автоматически возвращаться на базу, выгружать добычу и снова лететь сюда. Одновременно на одном астероиде могут работать до <b>2 добытчиков</b>.'
+        );
+        return;
+      }
+
+      if(selectedFleet.length){
+        const minersOnly = selectedFleet.every(s => s.canMineResearch);
+        if(!minersOnly){
+          scoutCommandHint.textContent = 'Ксенит добывают только специальные корабли-добытчики.';
+          scoutCommandHint.classList.add('show');
+          setTimeout(() => scoutCommandHint.classList.remove('show'), 2400);
+          return;
+        }
+        sendSelectedFleetToPlanet(a);
+        return;
+      }
+
+      const miners = scouts.filter(s =>
+        s.owner === 'player' &&
+        s.orbitPlanet === a &&
+        !s.targetPlanet &&
+        s.canMineResearch
+      );
+
+      if(miners.length){
+        chooseFleetForTravel(miners);
+        scoutCommandHint.textContent =
+          'Выбрано добытчиков: ' + miners.length + '. Теперь укажите планету или другой астероид.';
+        scoutCommandHint.classList.add('show');
+        setTimeout(() => scoutCommandHint.classList.remove('show'), 3400);
+      }else{
+        scoutCommandHint.textContent =
+          'Астероид. Сюда можно отправить до двух специальных добывающих кораблей.';
+        scoutCommandHint.classList.add('show');
+        setTimeout(() => scoutCommandHint.classList.remove('show'), 2600);
+      }
+    }, {passive:false});
+
+    asteroidLayer.appendChild(wrap);
+    a.el = wrap;
+  });
+}
+
+
+
+function updatePlanetMapData(p){
+  if(!p.labelEl || !p.tagEl) return;
+
+  const visible = gameSettings.planetLabels === 'all' || p.playerScanned || p.owner === 'player' || p.owner === 'enemy';
+  if(visible){
+    p.labelEl.textContent = p.name;
+    p.labelEl.classList.remove('planet-data-hidden');
+    p.tagEl.textContent = (p.isRare ? '★ ' : '') + p.resources.join(' • ');
+    p.tagEl.classList.remove('planet-data-hidden');
+  }else{
+    p.labelEl.textContent = '';
+    p.tagEl.textContent = '';
+    p.labelEl.classList.add('planet-data-hidden');
+    p.tagEl.classList.add('planet-data-hidden');
+  }
+}
+
+function planetSuitabilityText(p){
+  return p.habitable
+    ? 'пригодна для заселения людей'
+    : 'непригодна для постоянного населения — подходит для добывающей инфраструктуры';
+}
+
+function addPlanetVisual(p){
+  const style = STYLE_DEFS[p.styleKey];
+  const sprite = SPRITES[p.styleKey];
+  const isRinged = [
+    'cream_ringed','cyan_ringed','green_ringed','pink_ringed','saturn_tall',
+    'amethyst_ringed','ivory_ringed'
+  ].includes(p.styleKey);
+  if(p.owner === 'player' || p.owner === 'enemy'){
+    const aura = document.createElement('div');
+    aura.className = 'spawnAura ' + (p.owner === 'player' ? 'player' : 'enemy');
+    aura.style.left = p.x + 'px'; aura.style.top = p.y + 'px';
+    aura.style.width = (p.r * 4.6) + 'px'; aura.style.height = (p.r * 4.6) + 'px';
+    planetLayer.appendChild(aura);
+    p.auraEl = aura;
+  }else{
+    p.auraEl = null;
+  }
+  const wrap = document.createElement('div');
+  wrap.className = 'planetWrap';
+  wrap.style.left = p.x + 'px'; wrap.style.top = p.y + 'px';
+  wrap.style.animationDuration = rand(13, 22).toFixed(2) + 's';
+  wrap.style.animationDelay = '-' + rand(0, 10).toFixed(2) + 's';
+
+  const displayW = p.r * 2 * style.display;
+  const displayH = displayW * (sprite.h / sprite.w);
+  wrap.style.width = displayW + 'px';
+  wrap.style.height = Math.max(displayH, p.r*2*1.12) + 'px';
+
+  const backShadow = document.createElement('div');
+  backShadow.className = 'planetBackShadow';
+  backShadow.style.width = (displayW * (isRinged ? 0.90 : 0.72)) + 'px';
+  backShadow.style.height = (p.r * (isRinged ? 1.05 : 0.92)) + 'px';
+  wrap.appendChild(backShadow);
+
+  const glow = document.createElement('div');
+  glow.className = 'planetGlow';
+  glow.style.width = (p.r * 2.24) + 'px'; glow.style.height = (p.r * 2.24) + 'px';
+  glow.style.background = style.glow;
+  glow.style.animationDuration = rand(3.8, 6.2).toFixed(2) + 's';
+  glow.style.animationDelay = '-' + rand(0, 4).toFixed(2) + 's';
+  wrap.appendChild(glow);
+
+  const spin = document.createElement('div');
+  spin.className = 'planetSpin';
+  spin.style.animationDuration = rand(90, 210).toFixed(1) + 's';
+  spin.style.animationDelay = '-' + rand(0, 80).toFixed(1) + 's';
+  spin.style.animationDirection = Math.random() < 0.5 ? 'normal' : 'reverse';
+
+  const img = document.createElement('img');
+  img.className = 'planetImg';
+  img.src = sprite.src;
+  img.width = Math.round(displayW);
+  img.height = Math.round(displayH);
+  spin.appendChild(img);
+  wrap.appendChild(spin);
+
+  const coreSize = p.r * 2.06;
+  const shade = document.createElement('div');
+  shade.className = 'planetShade';
+  shade.style.width = coreSize + 'px';
+  shade.style.height = coreSize + 'px';
+  wrap.appendChild(shade);
+
+  const rim = document.createElement('div');
+  rim.className = 'planetRim';
+  rim.style.width = (p.r * 2.12) + 'px';
+  rim.style.height = (p.r * 2.12) + 'px';
+  wrap.appendChild(rim);
+
+  const spec = document.createElement('div');
+  spec.className = 'planetSpec';
+  spec.style.width = (p.r * 1.92) + 'px';
+  spec.style.height = (p.r * 1.92) + 'px';
+  spec.style.opacity = isRinged ? '.65' : '.85';
+  wrap.appendChild(spec);
+
+  planetLayer.appendChild(wrap);
+  p.wrapEl = wrap;
+
+  const label = document.createElement('div');
+  label.className = 'label ' + (p.owner === 'player' ? 'spawnPlayer' : p.owner === 'enemy' ? 'spawnEnemy' : '');
+  label.style.left = p.x + 'px'; label.style.top = (p.y + p.r + 14) + 'px';
+  label.textContent = p.name;
+  planetLayer.appendChild(label);
+
+  const tag = document.createElement('div');
+  tag.className = 'resourceTag' + (p.isRare ? ' rare' : '');
+  tag.style.left = p.x + 'px'; tag.style.top = (p.y + p.r + 34) + 'px';
+  tag.textContent = (p.isRare ? '★ ' : '') + p.resources.join(' • ');
+  planetLayer.appendChild(tag);
+
+  p.labelEl = label;
+  p.tagEl = tag;
+  updatePlanetMapData(p);
+
+  const hit = document.createElement('div');
+  hit.className = 'planetHit';
+  hit.style.left = p.x + 'px';
+  hit.style.top = p.y + 'px';
+  const hitSize = Math.max(70, p.r * 2.4);
+  hit.style.width = hitSize + 'px';
+  hit.style.height = hitSize + 'px';
+  hit.addEventListener('pointerdown', e => {
+    if(!gameStarted) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    if(selectedFleet.length){
+      sendSelectedFleetToPlanet(p);
+      return;
+    }
+
+    if(selectedScout && selectedScout.owner === 'player'){
+      if(selectedScout.orbitPlanet === p){
+        clearScoutSelection();
+        openPlanetInfo(p);
+        return;
+      }
+
+      if(!canScoutTargetPlanet(selectedScout, p)){
+        scoutCommandHint.textContent =
+          'Планета слишком далеко от текущей зоны разведки. Сначала исследуйте более близкую систему.';
+        scoutCommandHint.classList.add('show');
+        clearTimeout(hit._hintTimer);
+        hit._hintTimer = setTimeout(() => scoutCommandHint.classList.remove('show'), 2600);
+        return;
+      }
+
+      const wasHidden = !isPlanetDiscovered(p);
+      setScoutTarget(selectedScout, p);
+
+      if(wasHidden){
+        scoutCommandHint.textContent =
+          'Планета обнаружена радаром. Разведчик летит к ней — туман исчезнет после исследования.';
+        scoutCommandHint.classList.add('show');
+        clearTimeout(hit._hintTimer);
+        hit._hintTimer = setTimeout(() => scoutCommandHint.classList.remove('show'), 3200);
+      }
+      return;
+    }
+
+    if(!isPlanetDiscovered(p)){
+      scoutCommandHint.textContent =
+        'Эта планета ещё не исследована. Выберите разведчика на ближайшей открытой планете.';
+      scoutCommandHint.classList.add('show');
+      clearTimeout(hit._hintTimer);
+      hit._hintTimer = setTimeout(() => scoutCommandHint.classList.remove('show'), 2400);
+      return;
+    }
+
+    openPlanetInfo(p);
+  }, {passive:false});
+  planetLayer.appendChild(hit);
+  p.hitEl = hit;
+}
+function buildPlanets(){ planetLayer.innerHTML = ''; planets.forEach(addPlanetVisual); }
+function addStartTip(){
+  const tip = document.createElement('div');
+  tip.className = 'startTip';
+  tip.style.left = playerPlanet.x + 'px';
+  tip.style.top = (playerPlanet.y - playerPlanet.r - 24) + 'px';
+  tip.innerHTML = 'Аврора Прайм — ваша стартовая колония. Отсюда начнутся развитие, разведка и экспансия.';
+  planetLayer.appendChild(tip);
+  setTimeout(() => tip.remove(), 5200);
+}
+
+function miniPoint(x,y){
+  const mw = minimap.clientWidth;
+  const mh = minimap.clientHeight;
+  return {
+    x:(x / WORLD_W) * mw,
+    y:(y / WORLD_H) * mh
+  };
+}
+
+
+const PERF = {
+  miniLast:0,
+  miniInterval:125,       // 8 обновлений/сек вместо 60
+  resourceLast:0,
+  resourceInterval:240,   // около 4 обновлений/сек
+  simulationAccumulator:0,
+  simulationStep:.10,
+  fogRenderedCount:0,
+  miniFogRenderedCount:0,
+  fogMode:null,
+  miniFogW:0,
+  miniFogH:0,
+  cullLast:0,
+  cullInterval:180,
+  cullingDirty:true
+};
+
+function worldViewportBounds(margin=220){
+  const inv = 1 / Math.max(.01,scale);
+  return {
+    left:(-x)*inv - margin,
+    top:(-y)*inv - margin,
+    right:(innerWidth-x)*inv + margin,
+    bottom:(innerHeight-y)*inv + margin
+  };
+}
+function isWorldPointNearViewport(px,py,margin=180){
+  const b = worldViewportBounds(margin);
+  return px >= b.left && px <= b.right && py >= b.top && py <= b.bottom;
+}
+function updateWorldCulling(force=false){
+  const now = performance.now();
+  if(!force && !PERF.cullingDirty && now-PERF.cullLast < PERF.cullInterval) return;
+  if(!force && now-PERF.cullLast < PERF.cullInterval) return;
+  PERF.cullLast = now;
+  PERF.cullingDirty = false;
+
+  const b = worldViewportBounds(300);
+  const inside = (px,py,r=0) =>
+    px+r >= b.left && px-r <= b.right && py+r >= b.top && py-r <= b.bottom;
+
+  planets.forEach(p=>{
+    const visible = inside(p.x,p.y,Math.max(90,p.r*3));
+    if(p.wrapEl) p.wrapEl.style.display = visible ? '' : 'none';
+    if(p.auraEl) p.auraEl.style.display = visible ? '' : 'none';
+    if(p.hitEl) p.hitEl.style.display = visible ? '' : 'none';
+    if(p.labelEl) p.labelEl.style.display = visible ? '' : 'none';
+    if(p.tagEl) p.tagEl.style.display = visible ? '' : 'none';
+  });
+
+  researchAsteroids.forEach(a=>{
+    if(a.el) a.el.style.display = inside(a.x,a.y,110) ? '' : 'none';
+  });
+}
+
+function isEnemyShipVisibleOnMini(ship){
+  if(ship.owner !== 'enemy') return false;
+  if(!gameSettings.fog) return true;
+  if(ship.combatTarget && ship.combatTarget.owner === 'player') return true;
+  if(ship.targetPlanet && ship.targetPlanet.owner === 'player') return true;
+  if(ship.orbitPlanet && ship.orbitPlanet.owner === 'player') return true;
+  return isExploredPoint(ship.x,ship.y);
+}
+
+function updateMiniDynamic(force=false){
+  if(gameSettings.minimap === 'off') return;
+
+  const now = performance.now();
+  if(!force && now - PERF.miniLast < PERF.miniInterval) return;
+  PERF.miniLast = now;
+
+  const mw = minimap.clientWidth, mh = minimap.clientHeight;
+  const dots = [];
+  const alerts = [];
+
+  for(const ship of scouts){
+    if(ship.destroyed || !isEnemyShipVisibleOnMini(ship)) continue;
+    dots.push(
+      '<span class="miniShipDot enemy" style="left:' +
+      ((ship.x/WORLD_W)*mw).toFixed(1) + 'px;top:' +
+      ((ship.y/WORLD_H)*mh).toFixed(1) + 'px"></span>'
+    );
+  }
+
+  for(const planet of planets){
+    if(planet.owner !== 'player' || !planet.captureState) continue;
+    alerts.push(
+      '<span class="miniAlertPing" style="left:' +
+      ((planet.x/WORLD_W)*mw).toFixed(1) + 'px;top:' +
+      ((planet.y/WORLD_H)*mh).toFixed(1) + 'px"></span>'
+    );
+  }
+
+  for(const ship of scouts){
+    if(ship.owner !== 'player') continue;
+    if(!ship.combatTarget && !ship.attackAlerted) continue;
+    alerts.push(
+      '<span class="miniAlertPing" style="left:' +
+      ((ship.x/WORLD_W)*mw).toFixed(1) + 'px;top:' +
+      ((ship.y/WORLD_H)*mh).toFixed(1) + 'px"></span>'
+    );
+  }
+
+  const dotsHtml = dots.join('');
+  const alertsHtml = alerts.join('');
+
+  if(updateMiniDynamic._dotsHtml !== dotsHtml){
+    miniDynamicDots.innerHTML = dotsHtml;
+    updateMiniDynamic._dotsHtml = dotsHtml;
+  }
+  if(updateMiniDynamic._alertsHtml !== alertsHtml){
+    miniAlerts.innerHTML = alertsHtml;
+    updateMiniDynamic._alertsHtml = alertsHtml;
+  }
+}
+
+function buildMiniMapDots(){
+  miniDots.innerHTML = ''; const mw = minimap.clientWidth, mh = minimap.clientHeight;
+  planets.forEach(p => {
+    const dot = document.createElement('span');
+    dot.className = 'miniDot ' + (p.owner === 'player' ? 'player' : p.owner === 'enemy' ? 'enemy' : 'neutral');
+    dot.style.left = ((p.x / WORLD_W) * mw) + 'px'; dot.style.top = ((p.y / WORLD_H) * mh) + 'px';
+    miniDots.appendChild(dot);
+  });
+  updateMiniDynamic(true);
+}
+const SCOUT_SENSOR_RANGE = 720; // увеличенная дальность спутника-разведчика
+
+function isExploredPoint(px,py){
+  return exploredAreas.some(a => Math.hypot(px-a.x, py-a.y) <= a.r * .92);
+}
+
+function isPlanetDiscovered(planet){
+  return exploredAreas.some(a => {
+    const d = Math.hypot(planet.x-a.x, planet.y-a.y);
+    return d <= a.r + Math.max(22, planet.r * .75);
+  });
+}
+
+function canScoutTargetPlanet(scout, planet){
+  if(planet.kind === 'researchAsteroid'){
+    return !!scout.canMineResearch && isExploredPoint(planet.x,planet.y);
+  }
+
+  if(isPlanetDiscovered(planet)) return true;
+
+  if(!scout.canScan) return false;
+
+  // Только разведчики могут обнаруживать соседние планеты через туман.
+  const origin = scout.orbitPlanet || scout;
+  return Math.hypot(planet.x-origin.x, planet.y-origin.y) <= SCOUT_SENSOR_RANGE;
+}
+
+function revealArea(px,py,radius){
+  exploredAreas.push({x:px,y:py,r:radius});
+  drawFog();
+}
+
+function paintMainFogHole(a){
+  const s = FOG_RENDER_SCALE;
+  const ax = a.x*s, ay = a.y*s, ar = a.r*s;
+  const grad = fogCtx.createRadialGradient(ax,ay,ar*.58,ax,ay,ar);
+  grad.addColorStop(0,'rgba(0,0,0,1)');
+  grad.addColorStop(.78,'rgba(0,0,0,.96)');
+  grad.addColorStop(1,'rgba(0,0,0,0)');
+  fogCtx.fillStyle = grad;
+  fogCtx.beginPath();
+  fogCtx.arc(ax,ay,ar,0,Math.PI*2);
+  fogCtx.fill();
+}
+
+function paintMiniFogHole(a,mw,mh){
+  const mx = (a.x/WORLD_W)*mw;
+  const my = (a.y/WORLD_H)*mh;
+  const mr = (a.r/WORLD_W)*mw;
+  const grad = miniFogCtx.createRadialGradient(mx,my,mr*.58,mx,my,mr);
+  grad.addColorStop(0,'rgba(0,0,0,1)');
+  grad.addColorStop(.78,'rgba(0,0,0,.96)');
+  grad.addColorStop(1,'rgba(0,0,0,0)');
+  miniFogCtx.fillStyle = grad;
+  miniFogCtx.beginPath();
+  miniFogCtx.arc(mx,my,mr,0,Math.PI*2);
+  miniFogCtx.fill();
+}
+
+function drawFog(forceFull=false){
+  const mw = Math.max(1,minimap.clientWidth);
+  const mh = Math.max(1,minimap.clientHeight);
+
+  if(!gameSettings.fog){
+    if(PERF.fogMode !== 'off' || forceFull){
+      fogCtx.setTransform(1,0,0,1,0,0);
+      fogCtx.globalCompositeOperation = 'source-over';
+      fogCtx.clearRect(0,0,fogCanvas.width,fogCanvas.height);
+
+      if(miniFog.width !== mw) miniFog.width = mw;
+      if(miniFog.height !== mh) miniFog.height = mh;
+      miniFogCtx.clearRect(0,0,mw,mh);
+
+      PERF.fogRenderedCount = 0;
+      PERF.miniFogRenderedCount = 0;
+      PERF.miniFogW = mw;
+      PERF.miniFogH = mh;
+      PERF.fogMode = 'off';
+    }
+    updateMiniDynamic(true);
+    return;
+  }
+
+  const mainFull =
+    forceFull ||
+    PERF.fogMode !== 'on' ||
+    PERF.fogRenderedCount > exploredAreas.length;
+
+  if(mainFull){
+    fogCtx.globalCompositeOperation = 'source-over';
+    fogCtx.clearRect(0,0,fogCanvas.width,fogCanvas.height);
+    fogCtx.fillStyle = 'rgb(2,7,16)';
+    fogCtx.fillRect(0,0,fogCanvas.width,fogCanvas.height);
+    PERF.fogRenderedCount = 0;
+  }
+
+  if(PERF.fogRenderedCount < exploredAreas.length){
+    fogCtx.globalCompositeOperation = 'destination-out';
+    for(let i=PERF.fogRenderedCount;i<exploredAreas.length;i++){
+      paintMainFogHole(exploredAreas[i]);
+    }
+    fogCtx.globalCompositeOperation = 'source-over';
+    PERF.fogRenderedCount = exploredAreas.length;
+  }
+
+  const miniSizeChanged = PERF.miniFogW !== mw || PERF.miniFogH !== mh;
+  if(miniFog.width !== mw) miniFog.width = mw;
+  if(miniFog.height !== mh) miniFog.height = mh;
+
+  const miniFull =
+    forceFull ||
+    PERF.fogMode !== 'on' ||
+    miniSizeChanged ||
+    PERF.miniFogRenderedCount > exploredAreas.length;
+
+  if(miniFull){
+    miniFogCtx.globalCompositeOperation = 'source-over';
+    miniFogCtx.clearRect(0,0,mw,mh);
+    miniFogCtx.fillStyle = 'rgb(2,7,16)';
+    miniFogCtx.fillRect(0,0,mw,mh);
+    PERF.miniFogRenderedCount = 0;
+    PERF.miniFogW = mw;
+    PERF.miniFogH = mh;
+  }
+
+  if(PERF.miniFogRenderedCount < exploredAreas.length){
+    miniFogCtx.globalCompositeOperation = 'destination-out';
+    for(let i=PERF.miniFogRenderedCount;i<exploredAreas.length;i++){
+      paintMiniFogHole(exploredAreas[i],mw,mh);
+    }
+    miniFogCtx.globalCompositeOperation = 'source-over';
+    PERF.miniFogRenderedCount = exploredAreas.length;
+  }
+
+  PERF.fogMode = 'on';
+}
+
+function scaledW(){ return WORLD_W * scale; }
+function scaledH(){ return WORLD_H * scale; }
+function bounds(){ return {minX:Math.min(0, innerWidth-scaledW()), minY:Math.min(0, innerHeight-scaledH())}; }
+function clamp(){ const b = bounds(); if(scaledW() <= innerWidth) x = (innerWidth-scaledW())/2; else x = Math.max(b.minX, Math.min(0, x)); if(scaledH() <= innerHeight) y = (innerHeight-scaledH())/2; else y = Math.max(b.minY, Math.min(0, y)); }
+function updateMini(){ const mw = minimap.clientWidth, mh = minimap.clientHeight; const viewW = innerWidth/(WORLD_W*scale)*mw, viewH = innerHeight/(WORLD_H*scale)*mh; const px = (-x/(WORLD_W*scale))*mw, py = (-y/(WORLD_H*scale))*mh; miniView.style.width = viewW+'px'; miniView.style.height = viewH+'px'; miniView.style.transform = 'translate3d('+px+'px,'+py+'px,0)'; updateMiniDynamic(false); }
+function render(){ clamp(); world.style.transformOrigin = '0 0'; world.style.transform = 'translate3d('+x+'px,'+y+'px,0) scale('+scale+')'; PERF.cullingDirty = true; updateMini(); }
+function setZoom(nextScale, screenX=innerWidth/2, screenY=innerHeight/2){ nextScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, nextScale)); if(Math.abs(nextScale-scale) < 0.001) return; const worldX = (screenX-x)/scale, worldY = (screenY-y)/scale; scale = nextScale; x = screenX-worldX*scale; y = screenY-worldY*scale; render(); }
+function jump(cx,cy){ const r = minimap.getBoundingClientRect(); const mx = Math.max(0, Math.min(r.width, cx-r.left)), my = Math.max(0, Math.min(r.height, cy-r.top)); const targetWorldX = (mx/r.width)*WORLD_W, targetWorldY = (my/r.height)*WORLD_H; x = innerWidth/2-targetWorldX*scale; y = innerHeight/2-targetWorldY*scale; render(); }
+let pinchPointers = new Map(), pinchStartDistance = 0, pinchStartScale = 1, pinchCenterX = 0, pinchCenterY = 0;
+function uiHit(target){ return minimap.contains(target) || target.closest('.planetHit') || target.closest('.scout') || target.closest('#planetFleetOverlay') || target.closest('#shipControlOverlay'); }
+minimap.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); jump(e.clientX,e.clientY); }, {passive:false});
+viewport.addEventListener('pointerdown', e => {
+  if(uiHit(e.target)) return;
+  if(e.pointerType==='touch'){
+    pinchPointers.set(e.pointerId, {x:e.clientX,y:e.clientY});
+    if(pinchPointers.size===2){
+      const pts=[...pinchPointers.values()];
+      pinchStartDistance=Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+      pinchStartScale=scale; pinchCenterX=(pts[0].x+pts[1].x)/2; pinchCenterY=(pts[0].y+pts[1].y)/2;
+      pan=false; panPointer=null; return;
+    }
+  }
+  if(e.pointerType==='mouse' && e.button!==0) return;
+  e.preventDefault(); pan=true; panMoved=false; panPointer=e.pointerId; panStartX=e.clientX; panStartY=e.clientY; worldStartX=x; worldStartY=y;
+  try{ viewport.setPointerCapture(e.pointerId); }catch(err){}
+}, {passive:false});
+viewport.addEventListener('pointermove', e => {
+  if(e.pointerType==='touch' && pinchPointers.has(e.pointerId)){
+    pinchPointers.set(e.pointerId, {x:e.clientX,y:e.clientY});
+    if(pinchPointers.size===2){
+      e.preventDefault(); const pts=[...pinchPointers.values()]; const d=Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+      if(pinchStartDistance>0) setZoom(pinchStartScale*(d/pinchStartDistance), pinchCenterX, pinchCenterY);
+      return;
+    }
+  }
+  if(!pan || e.pointerId!==panPointer) return;
+  if(Math.hypot(e.clientX-panStartX,e.clientY-panStartY) > 8) panMoved=true;
+  e.preventDefault(); x=worldStartX+(e.clientX-panStartX)*cameraPanFactor; y=worldStartY+(e.clientY-panStartY)*cameraPanFactor; render();
+}, {passive:false});
+function clearPinchPointer(e){ if(e && pinchPointers.has(e.pointerId)) pinchPointers.delete(e.pointerId); if(pinchPointers.size < 2) pinchStartDistance = 0; }
+function endPan(e){
+  clearPinchPointer(e);
+  if(e && panPointer !== null && e.pointerId !== panPointer) return;
+  const wasTap = !!e && pan && !panMoved && pinchPointers.size === 0;
+  pan = false; panPointer = null;
+  if(!wasTap) return;
+
+  const p = screenToWorldPoint(e.clientX,e.clientY);
+  if(pointCommandShips.length){
+    sendShipsToPoint(pointCommandShips,p.x,p.y);
+    pointCommandShips = [];
+    clearSelectedFleet();
+    clearScoutSelection();
+    return;
+  }
+  if(selectedFleet.length && selectedFleet.every(s => s.type !== 'scout')){
+    sendShipsToPoint([...selectedFleet],p.x,p.y);
+    clearSelectedFleet();
+    clearScoutSelection();
+  }
+}
+viewport.addEventListener('pointerup', endPan, {passive:false}); viewport.addEventListener('pointercancel', endPan, {passive:false});
+viewport.addEventListener('wheel', e => { e.preventDefault(); const delta = e.deltaY < 0 ? 0.12 : -0.12; setZoom(scale + delta, e.clientX, e.clientY); }, {passive:false});
+
+
+function gameTimeText(){
+  const total = Math.max(0, Math.floor(gameElapsed));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+
+function ensureEventAudio(){
+  if(!gameSettings.eventSounds) return null;
+  try{
+    if(!eventAudioContext){
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if(Ctx) eventAudioContext = new Ctx();
+    }
+    if(eventAudioContext?.state === 'suspended') eventAudioContext.resume().catch(()=>{});
+    return eventAudioContext;
+  }catch(err){ return null; }
+}
+function playEventSound(kind){
+  if(!gameSettings.eventSounds || gameSettings.eventVolume <= 0) return;
+  const ctx = ensureEventAudio();
+  if(!ctx) return;
+  try{
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const now = ctx.currentTime;
+    const volume = Math.max(.001,(gameSettings.eventVolume/100)*.055);
+    const freq = kind === 'attack' ? 240 : kind === 'detection' ? 420 : kind === 'success' ? 690 : 520;
+    osc.type = kind === 'attack' ? 'sawtooth' : 'sine';
+    osc.frequency.setValueAtTime(freq,now);
+    if(kind === 'attack') osc.frequency.exponentialRampToValueAtTime(155,now+.18);
+    gain.gain.setValueAtTime(volume,now);
+    gain.gain.exponentialRampToValueAtTime(.001,now+.22);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(now); osc.stop(now+.24);
+  }catch(err){}
+}
+function vibrateForEvent(kind){
+  if(!gameSettings.vibration || !navigator.vibrate) return;
+  if(kind === 'attack') navigator.vibrate([70,45,100]);
+  else if(kind === 'detection') navigator.vibrate([45,40,45]);
+  else if(kind === 'success') navigator.vibrate(35);
+}
+function triggerAutoSlow(kind){
+  if(!gameSettings.autoSlow || !gameStarted || !['attack','detection'].includes(kind)) return;
+  if(autoSlowTimer) clearTimeout(autoSlowTimer);
+  if(autoSlowPreviousSpeed === null) autoSlowPreviousSpeed = gameSpeed;
+  setGameSpeed(.5,false);
+  autoSlowTimer = setTimeout(()=>{
+    if(autoSlowPreviousSpeed !== null){
+      setGameSpeed(autoSlowPreviousSpeed,false);
+      autoSlowPreviousSpeed = null;
+    }
+    autoSlowTimer = null;
+  },8000);
+}
+
+function pushEvent(message, kind='normal'){
+  const item = document.createElement('div');
+  item.className = 'eventItem ' + kind;
+
+  const time = document.createElement('span');
+  time.className = 'eventTime';
+  time.textContent = gameTimeText();
+
+  const body = document.createElement('span');
+  body.textContent = message;
+
+  item.appendChild(time);
+  item.appendChild(body);
+  eventLogItems.appendChild(item);
+
+  while(eventLogItems.children.length > 80){
+    eventLogItems.removeChild(eventLogItems.firstChild);
+  }
+  eventLogItems.scrollTop = eventLogItems.scrollHeight;
+
+  if(!eventLogPanel.classList.contains('open')){
+    unreadEvents++;
+    eventLogBadge.textContent = unreadEvents > 99 ? '99+' : String(unreadEvents);
+    eventLogBadge.style.display = 'block';
+  }
+
+  if(kind === 'detection') setAlertLevel('orange');
+  if(kind === 'attack') setAlertLevel('red');
+
+  if(['attack','detection','success'].includes(kind)){
+    playEventSound(kind);
+    vibrateForEvent(kind);
+    triggerAutoSlow(kind);
+  }
+}
+
+function setAlertLevel(level){
+  if(level === 'red'){
+    alertLevel = 'red';
+  }else if(level === 'orange' && alertLevel !== 'red'){
+    alertLevel = 'orange';
+  }else if(level === 'none'){
+    alertLevel = 'none';
+  }
+
+  eventAlertLamp.className = '';
+  if(alertLevel !== 'none') eventAlertLamp.classList.add(alertLevel);
+}
+
+function clearEventAlert(){
+  setAlertLevel('none');
+}
+
+function openEventLog(){
+  eventLogPanel.classList.add('open');
+  unreadEvents = 0;
+  eventLogBadge.style.display = 'none';
+  clearEventAlert();
+  eventLogItems.scrollTop = eventLogItems.scrollHeight;
+}
+function closeEventLog(){
+  eventLogPanel.classList.remove('open');
+}
+eventLogButton.addEventListener('click', () => {
+  if(eventLogPanel.classList.contains('open')) closeEventLog();
+  else openEventLog();
+});
+eventLogClose.addEventListener('click', closeEventLog);
+
+function setGameSpeed(value,save=true){
+  gameSpeed = Number(value) || 1;
+  if(save){
+    gameSettings.gameSpeed = gameSpeed;
+    saveGameSettings();
+  }
+  document.querySelectorAll('.speedBtn').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.speed) === gameSpeed);
+  });
+  if(selectedSpeedBadge){
+    selectedSpeedBadge.textContent = '×' + (String(gameSpeed).endsWith('.0') ? String(gameSpeed).slice(0,-2) : gameSpeed);
+  }
+}
+
+
+function loadGameSettings(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('astroEmpireSettings') || '{}');
+    gameSettings = {...DEFAULT_GAME_SETTINGS,...saved};
+  }catch(err){
+    gameSettings = {...DEFAULT_GAME_SETTINGS};
+  }
+}
+function saveGameSettings(){
+  try{ localStorage.setItem('astroEmpireSettings',JSON.stringify(gameSettings)); }catch(err){}
+}
+function colorValue(side,value){
+  const map = side === 'player'
+    ? {blue:'#62b8ff',green:'#68df91',purple:'#ba80ff',gold:'#e8bf55'}
+    : {red:'#ff6e6e',orange:'#ff994d',magenta:'#ff5fa5'};
+  return map[value] || (side === 'player' ? '#62b8ff' : '#ff6e6e');
+}
+function updateAISettingDescription(){
+  const el = document.getElementById('aiSettingDescription');
+  if(!el) return;
+  const difficultyText = {
+    easy:'Лёгкий ИИ получает меньше ресурсов, медленнее строится и реже атакует.',
+    normal:'Нормальный ИИ играет без бонусов и постепенно расширяет империю.',
+    hard:'Сложный ИИ быстрее развивает экономику, строит флот и сильнее в бою.',
+    aggressive:'Агрессивный ИИ максимально быстро строит военный флот и чаще отправляет его к вашим владениям.'
+  }[gameSettings.aiDifficulty];
+  const styleText = {
+    economist:' Приоритет: шахты, инфраструктура, наука и новые колонии.',
+    balanced:' Приоритеты экономики, экспансии и флота сбалансированы.',
+    militarist:' Приоритет: боевые корабли, патрули и раннее давление.'
+  }[gameSettings.aiPersonality];
+  el.textContent = (difficultyText || '') + (styleText || '');
+}
+function syncSettingsControls(){
+  document.querySelectorAll('[data-setting]').forEach(el=>{
+    const key = el.dataset.setting;
+    if(key in gameSettings) el.value = String(gameSettings[key]);
+  });
+  document.querySelectorAll('[data-setting-toggle]').forEach(btn=>{
+    const key = btn.dataset.settingToggle;
+    const on = !!gameSettings[key];
+    btn.classList.toggle('is-on',on);
+    btn.textContent = on ? 'Вкл.' : 'Выкл.';
+  });
+  document.querySelectorAll('[data-setting-range]').forEach(el=>{
+    const key = el.dataset.settingRange;
+    if(key in gameSettings) el.value = String(gameSettings[key]);
+  });
+  updateAISettingDescription();
+}
+function applyGameSettings(rebuildStars=false){
+  const effectiveGraphics = gameSettings.powerSaver ? 'low' : gameSettings.graphics;
+  const effectiveEffects = gameSettings.powerSaver ? 'minimal' : gameSettings.effects;
+
+  document.body.classList.remove('graphics-low','graphics-medium','graphics-high','graphics-ultra','effects-minimal','effects-normal','effects-max','ui-animations-off','hints-off','no-action-highlight','patrol-ranges-off','power-saver','theme-blue','theme-purple','theme-gold');
+  document.body.classList.add('graphics-'+effectiveGraphics,'effects-'+effectiveEffects,'theme-'+gameSettings.theme);
+  if(!gameSettings.uiAnimations) document.body.classList.add('ui-animations-off');
+  if(!gameSettings.hints) document.body.classList.add('hints-off');
+  if(!gameSettings.actionHighlight) document.body.classList.add('no-action-highlight');
+  if(!gameSettings.patrolRanges) document.body.classList.add('patrol-ranges-off');
+  if(gameSettings.powerSaver) document.body.classList.add('power-saver');
+
+  document.documentElement.style.setProperty('--ui-scale',String(gameSettings.uiScale || 1));
+  document.documentElement.style.setProperty('--player-color',colorValue('player',gameSettings.playerColor));
+  document.documentElement.style.setProperty('--enemy-color',colorValue('enemy',gameSettings.enemyColor));
+
+  cameraPanFactor = ({slow:.72,normal:1,fast:1.35}[gameSettings.cameraSpeed] || 1);
+
+  if(minimap){
+    minimap.style.display = gameSettings.minimap === 'off' ? 'none' : 'block';
+    minimap.style.width = gameSettings.minimap === 'compact' ? '88px' : '120px';
+    minimap.style.height = gameSettings.minimap === 'compact' ? '70px' : '98px';
+  }
+
+  if(typeof planets !== 'undefined' && planets.length){
+    planets.forEach(updatePlanetMapData);
+  }
+  if(typeof drawFog === 'function') drawFog(true);
+  if(typeof buildMiniMapDots === 'function') buildMiniMapDots();
+  if(rebuildStars && typeof buildStars === 'function') buildStars();
+
+  if(planetManageBtn && !gameSettings.actionHighlight){
+    planetManageBtn.classList.remove('manage-highlight');
+  }
+
+  setGameSpeed(gameSettings.gameSpeed || gameSpeed,false);
+  syncSettingsControls();
+}
+function resetAllSettings(){
+  gameSettings = {...DEFAULT_GAME_SETTINGS};
+  saveGameSettings();
+  applyGameSettings(true);
+}
+
+function showMainMenuPanel(panel){
+  mainPanel.style.display = panel === 'main' ? 'grid' : 'none';
+  settingsPanel.style.display = panel === 'settings' ? 'block' : 'none';
+  tutorialPanel.style.display = panel === 'tutorial' ? 'block' : 'none';
+}
+
+document.querySelectorAll('.speedBtn').forEach(btn => {
+  btn.addEventListener('click', () => setGameSpeed(btn.dataset.speed));
+});
+document.querySelectorAll('[data-setting]').forEach(el=>{
+  el.addEventListener('change',()=>{
+    const key = el.dataset.setting;
+    let value = el.value;
+    if(['fps'].includes(key)) value = Number(value);
+    if(['uiScale'].includes(key)) value = Number(value);
+    gameSettings[key] = value;
+    saveGameSettings();
+    applyGameSettings(key === 'graphics');
+  });
+});
+document.querySelectorAll('[data-setting-toggle]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const key = btn.dataset.settingToggle;
+    gameSettings[key] = !gameSettings[key];
+    saveGameSettings();
+    applyGameSettings(key === 'powerSaver');
+  });
+});
+document.querySelectorAll('[data-setting-range]').forEach(el=>{
+  el.addEventListener('input',()=>{
+    gameSettings[el.dataset.settingRange] = Number(el.value);
+    saveGameSettings();
+  });
+});
+document.getElementById('resetSettingsBtn')?.addEventListener('click',resetAllSettings);
+openSettingsBtn.addEventListener('click', () => {
+  mainMenu.classList.remove('inGameSettings');
+  mainMenu.style.display = 'flex';
+  syncSettingsControls();
+  showMainMenuPanel('settings');
+});
+gameSettingsButton.addEventListener('click', () => {
+  if(!gameStarted) return;
+  syncSettingsControls();
+  mainMenu.classList.add('inGameSettings');
+  mainMenu.style.display = 'flex';
+  showMainMenuPanel('settings');
+});
+closeSettingsBtn.addEventListener('click', () => {
+  if(gameStarted && mainMenu.classList.contains('inGameSettings')){
+    mainMenu.classList.remove('inGameSettings');
+    mainMenu.style.display = 'none';
+  }else{
+    showMainMenuPanel('main');
+  }
+});
+openTutorialBtn.addEventListener('click', () => {
+  showMainMenuPanel('tutorial');
+});
+closeTutorialBtn.addEventListener('click', () => {
+  showMainMenuPanel('main');
+});
+loadGameSettings();
+applyGameSettings(false);
+showMainMenuPanel('main');
+
+
+
+function clearWaypointMarker(ship){
+  if(ship?.waypointEl){ ship.waypointEl.remove(); ship.waypointEl = null; }
+}
+function showWaypointMarker(ship,x,y){
+  clearWaypointMarker(ship);
+  const el = document.createElement('div');
+  el.className = 'waypointMarker';
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  world.appendChild(el);
+  ship.waypointEl = el;
+}
+function releaseShipSignalAssignment(ship){
+  if(!ship || !ship._aeAnomalyTargetId) return null;
+  const ae=window.AELivingGalaxy;
+  const a=ae?.anomalies?.find?.(x=>x.id===ship._aeAnomalyTargetId) || null;
+  if(a){
+    if(a.targetedBy===ship.id) a.targetedBy=null;
+    if(a.readyShipId===ship.id) a.readyShipId=null;
+    a._autoLootOpened=false;
+    a._autoLootPending=false;
+    a.el?.classList.remove('targeted','ready');
+    if(!a.resolved && a.el){
+      a.el.innerHTML='?<span class="aeAnomalyLabel">НЕИЗВЕСТНЫЙ СИГНАЛ</span>';
+    }
+  }
+  ship._aeAnomalyTargetId=null;
+  ship._aeAnomalyWaiting=false;
+  return a;
+}
+function nearestOwnedColonyToShip(ship){
+  let best = null, bestD = Infinity;
+  for(const p of planets){
+    if(p.owner !== 'player') continue;
+    const d = Math.hypot(p.x-ship.x,p.y-ship.y);
+    if(d < bestD){ bestD = d; best = p; }
+  }
+  return best || playerPlanet;
+}
+function setShipPointTarget(ship,x,y){
+  if(!ship || ship.owner !== 'player' || ship.type === 'scout') return false;
+  releaseShipSignalAssignment(ship);
+  if(ship.orbitPlanet) ship.lastDepartureTarget = ship.orbitPlanet;
+  ship.targetPlanet = null;
+  ship.targetPoint = {x,y};
+  ship.orbitPlanet = null;
+  ship.researchMining = null;
+  ship.planetMining = null;
+  ship.planetMiningCargo = {};
+  ship.autoPatrolPlanet = null;
+  ship.patrolState = null;
+  ship.combatTarget = null;
+  ship.stationary = false;
+  removePatrolVisual(ship);
+  showWaypointMarker(ship,x,y);
+  return true;
+}
+function sendShipsToPoint(ships,x,y){
+  const movable = (ships || []).filter(s => s && s.owner === 'player' && s.type !== 'scout' && !s.scanState && !s.cooldownState);
+  if(!movable.length){
+    scoutCommandHint.textContent = 'Спутники-разведчики нельзя отправлять в произвольную точку.';
+    scoutCommandHint.classList.add('show');
+    setTimeout(() => scoutCommandHint.classList.remove('show'),2200);
+    return false;
+  }
+  movable.forEach(s => setShipPointTarget(s,x,y));
+  pushEvent('Кораблей отправлено в указанную точку: ' + movable.length + '.', 'discovery');
+  scoutCommandHint.textContent = 'Корабли летят в отмеченную точку и остановятся там.';
+  scoutCommandHint.classList.add('show');
+  setTimeout(() => scoutCommandHint.classList.remove('show'),2600);
+  return true;
+}
+function beginPointCommand(ships){
+  pointCommandShips = (ships || []).filter(s => s && s.owner === 'player' && s.type !== 'scout');
+  if(!pointCommandShips.length) return;
+  scoutCommandHint.textContent = 'Нажмите на свободную точку карты. Корабль остановится там и будет ждать приказа.';
+  scoutCommandHint.classList.add('show');
+}
+function screenToWorldPoint(clientX,clientY){
+  return {
+    x:Math.max(0,Math.min(WORLD_W,(clientX-x)/scale)),
+    y:Math.max(0,Math.min(WORLD_H,(clientY-y)/scale))
+  };
+}
+
+function shipStatusText(ship){
+  if(ship.cooldownState){
+    const total = Math.max(1, ship.cooldownState.total || 120);
+    const percent = Math.max(0, Math.min(100, Math.round((1 - ship.cooldownState.remaining / total) * 100)));
+    return 'Заряд солнечных батарей • ' + percent + '%';
+  }
+  if(ship.scanState){ const n = activePlanetScanners(ship.scanState.planet, ship.owner).length; return 'Исследование планеты • ' + Math.ceil(ship.scanState.remaining) + ' сек.' + (n > 1 ? ' • ×' + n : ''); }
+  if(ship.resourceTransport){
+    const m = ship.resourceTransport;
+    const target = m.stage === 'returning' ? m.sourcePlanet : m.targetPlanet;
+    return (m.stage === 'returning' ? 'Возвращает груз' : 'Доставка ресурсов') +
+      ' • ' + m.total + ' ед. → «' + (target?.name || 'цель') + '»';
+  }
+  if(ship.planetMining){
+    const m = ship.planetMining;
+    if(m.stage === 'mining') return 'Загружает ресурсы на «' + m.planet.name + '» • ' + Math.ceil(m.remaining) + ' сек.';
+    if(m.stage === 'returning') return 'Возвращается с ресурсами на «' + m.homePlanet.name + '»';
+    return 'Грузовой рейс к «' + m.planet.name + '»';
+  }
+  if(ship.combatTarget) return 'В бою с «' + ship.combatTarget.name + '»';
+  if(ship._aeAnomalyWaiting) return '✦ У неизвестного сигнала • находка готова к осмотру';
+  if(ship._aeAnomalyTargetId) return 'Летит к неизвестному сигналу';
+  if(ship.targetPoint) return 'Летит к указанной точке';
+  if(ship.patrolState){
+    if(ship.patrolState.returning) return ship.autoPatrolPlanet
+      ? 'Возвращается в патруль вокруг «' + ship.autoPatrolPlanet.name + '»'
+      : 'Возвращается в зону патруля';
+    return ship.autoPatrolPlanet
+      ? 'Автопатруль вокруг «' + ship.autoPatrolPlanet.name + '»'
+      : 'Патрулирует область';
+  }
+  if(ship.targetPlanet){
+    const targetName = ship.targetPlanet.name || 'цель';
+    return 'В полёте к «' + targetName + '»';
+  }
+  if(ship.stationary) return 'Остановлен в открытом космосе';
+  if(ship.researchMining) return 'Добывает Ксенит';
+  if(ship.orbitPlanet) return 'На орбите «' + (ship.orbitPlanet.name || 'объекта') + '»';
+  return 'Ожидает приказа';
+}
+
+function attachShipClick(ship){
+  ship.el.addEventListener('pointerdown', e => {
+    if(!gameStarted || ship.owner !== 'player') return;
+    e.preventDefault();
+    e.stopPropagation();
+    openShipControl(ship);
+  }, {passive:false});
+}
+
+function openShipControl(ship){
+  if(!ship || ship.owner !== 'player') return;
+  controlledShip = ship;
+  const shipGroup = fleetGroupForShip(ship);
+  shipControlTitle.textContent = ship.name + (shipGroup ? ' • ' + fleetGroupLabel(shipGroup) : '');
+  shipControlStatus.textContent = shipStatusText(ship);
+
+  const busy = !!ship.scanState || !!ship.cooldownState;
+  const transportBusy = !!ship.resourceTransport;
+  const waitingAtSignal = !!ship._aeAnomalyWaiting;
+  shipReturnBtn.textContent = waitingAtSignal ? '↩ Вернуться без находки' : '↩ Возврат';
+  shipSignalBtn.textContent = waitingAtSignal ? '✦ Осмотреть находку' : '✦ К сигналу';
+  shipReturnBtn.disabled = busy || (!waitingAtSignal && !ship.lastDepartureTarget && !ship.homePlanet && !transportBusy);
+  shipStopBtn.disabled = busy || (!waitingAtSignal && !ship.targetPlanet && !ship.targetPoint && !ship.patrolState && !ship.combatTarget);
+  shipPatrolBtn.disabled = busy || transportBusy || waitingAtSignal;
+  shipPointBtn.disabled = busy || transportBusy || waitingAtSignal || ship.type === 'scout';
+  shipSignalBtn.disabled = busy || transportBusy || !!ship.researchMining || !!ship.planetMining;
+
+  if(waitingAtSignal){
+    shipControlNote.textContent =
+      'Находка уже обнаружена. Нажмите «Осмотреть находку», чтобы увидеть ресурсы или технологию и забрать всё. «Вернуться без находки» освободит сигнал и отправит корабль к ближайшей вашей колонии.';
+  }else if(ship.cooldownState){
+    shipControlNote.textContent =
+      'Разведчик заряжает батареи от солнечных панелей. Новые приказы станут доступны после завершения двухминутной зарядки.';
+  }else if(ship.scanState){
+    shipControlNote.textContent =
+      'Во время исследования планеты отменить приказ нельзя.';
+  }else if(ship.resourceTransport){
+    shipControlNote.textContent =
+      'Грузовой рейс активен. «Возврат» отменит доставку и отвезёт груз обратно на планету отправления. «Остановка» временно остановит корабль с грузом.';
+  }else if(ship.patrolState){
+    shipControlNote.textContent =
+      'Патруль активен. Корабль автоматически обнаружит и перехватит вражеский флот в своей зоне.';
+  }else{
+    shipControlNote.textContent =
+      (ship.type === 'scout'
+        ? 'Разведчик летает между планетами и может исследовать неизвестные сигналы. Произвольная точка для него недоступна.'
+        : 'Возврат отправит корабль назад. Остановка оставит его на месте. «К точке» позволяет указать любое свободное место на карте.');
+  }
+
+  shipControlOverlay.classList.add('open');
+}
+
+function closeShipControl(){
+  shipControlOverlay.classList.remove('open');
+  controlledShip = null;
+}
+shipControlClose.addEventListener('click', closeShipControl);
+shipControlOverlay.addEventListener('pointerdown', e => {
+  if(e.target === shipControlOverlay) closeShipControl();
+  else e.stopPropagation();
+});
+
+function stopShip(ship){
+  if(!ship || ship.scanState || ship.cooldownState) return;
+
+  releaseShipSignalAssignment(ship);
+
+  if(ship.owner === 'enemy' && ship.targetPlanet?.id){
+    enemyReservedPlanetIds.delete(ship.targetPlanet.id);
+  }
+
+  ship.targetPlanet = null;
+  ship.targetPoint = null;
+  clearWaypointMarker(ship);
+  ship.orbitPlanet = null;
+  ship.researchMining = null;
+  ship.planetMining = null;
+  ship.planetMiningCargo = {};
+  ship.miningCargo = 0;
+  ship.autoPatrolPlanet = null;
+  ship.combatTarget = null;
+  ship.patrolState = null;
+  ship.stationary = true;
+  removePatrolVisual(ship);
+
+  pushEvent(ship.name + ' остановлен в открытом космосе.', 'discovery');
+  updateScoutElement(ship);
+}
+
+function returnShip(ship){
+  if(!ship || ship.scanState || ship.cooldownState) return;
+
+  if(ship._aeAnomalyTargetId){
+    const wasWaiting=!!ship._aeAnomalyWaiting;
+    releaseShipSignalAssignment(ship);
+    const home=(ship.homePlanet?.owner==='player' ? ship.homePlanet : nearestOwnedColonyToShip(ship));
+    if(home){
+      ship.stationary=false;
+      setScoutTarget(ship,home,{silent:true});
+      pushEvent(ship.name+(wasWaiting?' оставил находку у сигнала':' отменил экспедицию')+' и возвращается на «'+home.name+'».','discovery');
+      showHint('«'+ship.name+'» возвращается на «'+home.name+'». Неизвестный сигнал снова доступен.');
+      return;
+    }
+  }
+
+  if(ship.resourceTransport){
+    const mission = ship.resourceTransport;
+    mission.stage = 'returning';
+    ship.stationary = false;
+    ship.patrolState = null;
+    ship.combatTarget = null;
+    removePatrolVisual(ship);
+    ship.targetPoint = null;
+    clearWaypointMarker(ship);
+
+    if(ship.orbitPlanet === mission.sourcePlanet){
+      finishResourceTransportArrival(ship,mission.sourcePlanet);
+      return;
+    }
+
+    setScoutTarget(ship,mission.sourcePlanet,{silent:true,preserveTransport:true});
+    pushEvent(
+      ship.name + ': доставка отменена, корабль возвращает груз на «' + mission.sourcePlanet.name + '».',
+      'discovery'
+    );
+    return;
+  }
+
+  const miningMissionActive = !!(ship.researchMining || ship.planetMining);
+  const returnTarget = (miningMissionActive && ship.homePlanet) ? ship.homePlanet : ship.lastDepartureTarget;
+  if(!returnTarget) return;
+
+  // Для добывающего рейса команда «Возврат» означает полный отзыв:
+  // корабль возвращается на базу, выгружает груз и больше сам не улетает.
+  const recallingAsteroidMiner = !!(ship.canMineResearch && ship.researchMining);
+  const recallingPlanetMiner = !!ship.planetMining;
+  if(recallingAsteroidMiner){
+    ship.researchMining.loopActive = false;
+    ship.researchMining.stage = 'returning';
+  }
+  if(recallingPlanetMiner){
+    ship.planetMining.loopActive = false;
+    ship.planetMining.stage = 'returning';
+  }
+
+  ship.stationary = false;
+  ship.autoPatrolPlanet = null;
+  ship.patrolState = null;
+  ship.combatTarget = null;
+  removePatrolVisual(ship);
+  ship.targetPoint = null; clearWaypointMarker(ship);
+
+  setScoutTarget(
+    ship,
+    returnTarget,
+    recallingAsteroidMiner
+      ? {preserveMining:true}
+      : recallingPlanetMiner
+        ? {preservePlanetMining:true}
+        : {}
+  );
+
+  if(recallingAsteroidMiner){
+    pushEvent(ship.name + ' отозван с астероида и возвращается на базу.', 'discovery');
+  }else if(recallingPlanetMiner){
+    pushEvent(ship.name + ' отозван с добывающей экспедиции и возвращается на базу.', 'discovery');
+  }
+}
+
+function enablePatrol(ship,options={}){
+  if(!ship || ship.scanState || ship.cooldownState) return false;
+  if(ship.resourceTransport){
+    if(!options.silent){
+      pushEvent('Сначала завершите доставку ресурсов или верните грузовой корабль на базу.', 'discovery');
+    }
+    return false;
+  }
+
+  if(ship.owner === 'enemy' && ship.targetPlanet?.id){
+    enemyReservedPlanetIds.delete(ship.targetPlanet.id);
+  }
+
+  const orbitBeforePatrol = ship.orbitPlanet;
+  const patrolCenter = options.aroundPlanet || ((orbitBeforePatrol && orbitBeforePatrol.owner===ship.owner) ? orbitBeforePatrol : null);
+
+  releaseShipSignalAssignment(ship);
+  ship.targetPlanet = null;
+  ship.targetPoint = null; clearWaypointMarker(ship);
+  ship.orbitPlanet = null;
+  ship.researchMining = null;
+  ship.planetMining = null;
+  ship.planetMiningCargo = {};
+  ship.combatTarget = null;
+  ship.stationary = false;
+  ship.autoPatrolPlanet = patrolCenter || null;
+  if(patrolCenter && !ship.homePlanet) ship.homePlanet=patrolCenter;
+  const patrolRadius = options.radius || 175;
+  ship.patrolState = {
+    cx:patrolCenter ? patrolCenter.x : ship.x,
+    cy:patrolCenter ? patrolCenter.y : ship.y,
+    radius:patrolRadius,
+    chaseRadius:options.chaseRadius || Math.max(patrolRadius + 110, patrolRadius * 1.65),
+    orbitRadius:54,
+    angle:Math.random()*Math.PI*2,
+    direction:Math.random()<.5 ? -1 : 1,
+    detectionCooldown:0,
+    returning:false,
+    chasing:false,
+    chaseTargetId:null
+  };
+  ensurePatrolVisual(ship);
+
+  if(!options.silent){
+    pushEvent(ship.name + ' переведён в режим патруля.', 'discovery');
+  }
+  return true;
+}
+
+shipReturnBtn.addEventListener('click', () => {
+  if(!controlledShip) return;
+  const ship = controlledShip;
+  closeShipControl();
+  returnShip(ship);
+});
+shipStopBtn.addEventListener('click', () => {
+  if(!controlledShip) return;
+  const ship = controlledShip;
+  closeShipControl();
+  stopShip(ship);
+});
+shipPatrolBtn.addEventListener('click', () => {
+  if(!controlledShip) return;
+  const ship = controlledShip;
+  closeShipControl();
+  enablePatrol(ship);
+});
+shipPointBtn.addEventListener('click', () => {
+  if(!controlledShip || controlledShip.type === 'scout') return;
+  const ship = controlledShip;
+  closeShipControl();
+  beginPointCommand([ship]);
+});
+
+shipSignalBtn.addEventListener('click', () => {
+  if(!controlledShip) return;
+  const ship = controlledShip;
+  if(ship.scanState || ship.cooldownState || ship.resourceTransport || ship.researchMining || ship.planetMining) return;
+  if(ship._aeAnomalyWaiting){
+    closeShipControl();
+    if(window.AELivingGalaxy?.openSignalForShip){
+      window.AELivingGalaxy.openSignalForShip(ship);
+    }else{
+      showHint('Находка обнаружена. Нажмите на жёлтый знак ! у сигнала.');
+    }
+    return;
+  }
+  closeShipControl();
+  clearSelectedFleet();
+  clearScoutSelection();
+  pointCommandShips = [];
+  signalCommandShip = ship;
+  ship.el?.classList.add('selected');
+  showHint('«' + ship.name + '» выбран. Теперь нажмите на неизвестный сигнал ? на карте.');
+});
+
+function ensurePatrolVisual(ship){
+  let ring = patrolVisuals.get(ship.id);
+  if(!ring){
+    ring = document.createElement('div');
+    ring.className = 'patrolRing';
+    scoutLayer.appendChild(ring);
+    patrolVisuals.set(ship.id,ring);
+  }
+  const p = ship.patrolState;
+  ring.style.display = 'block';
+  ring.style.left = p.cx + 'px';
+  ring.style.top = p.cy + 'px';
+  ring.style.width = (p.radius*2) + 'px';
+  ring.style.height = (p.radius*2) + 'px';
+}
+function removePatrolVisual(ship){
+  const ring = patrolVisuals.get(ship.id);
+  if(ring){
+    ring.remove();
+    patrolVisuals.delete(ship.id);
+  }
+}
+
+function orbitRadiusFor(planet){
+  return Math.max(planet.r + 18, 42);
+}
+
+function placeScoutOnOrbit(scout){
+  if(!scout.orbitPlanet) return;
+  const planet = scout.orbitPlanet;
+  const radius = orbitRadiusFor(planet);
+  scout.x = planet.x + Math.cos(scout.orbitAngle) * radius;
+  scout.y = planet.y + Math.sin(scout.orbitAngle) * radius * 0.62;
+}
+
+function makeScout(owner, planet, index, orbitAngle){
+  const el = document.createElement('div');
+  el.className = 'scout unitShip ship-world-scout ' + owner;
+  el.innerHTML = renderSatelliteIcon('size-world');
+  scoutLayer.appendChild(el);
+
+  const timerEl = document.createElement('div');
+  timerEl.className = 'scanTimer';
+  scoutLayer.appendChild(timerEl);
+
+  const scout = {
+    id: owner + '-scout-' + index,
+    type:'scout',
+    name: 'Разведчик ' + index,
+    owner,
+    x:planet.x,
+    y:planet.y,
+    targetPlanet:null,
+    targetPoint:null,
+    orbitPlanet:planet,
+    orbitAngle:orbitAngle,
+    orbitDirection:index % 2 === 0 ? -1 : 1,
+    orbitAngularSpeed:0.12 + index * 0.012,
+    speed:3.17,
+    el,
+    timerEl,
+    scanState:null,
+    cooldownState:null,
+    researchMining:null,
+    planetMining:null,
+    planetMiningCargo:{},
+    autoPatrolPlanet:null,
+    patrolState:null,
+    combatTarget:null,
+    attackCooldown:0,
+    stationary:false,
+    lastDepartureTarget:planet,
+    canScan:true,
+    canMineResearch:false,
+    lastRevealX:planet.x,
+    lastRevealY:planet.y,
+    idleTimer:0
+  };
+
+  const profile = COMBAT_PROFILES.scout;
+  scout.maxHp = profile.hp;
+  scout.hp = profile.hp;
+  scout.damage = profile.damage;
+  scout.attackRange = profile.range;
+  scout.attackInterval = profile.interval;
+
+  attachShipClick(scout);
+  scouts.push(scout);
+  placeScoutOnOrbit(scout);
+  updateScoutElement(scout);
+  return scout;
+}
+
+function updateScoutElement(scout){
+  if(!scout?.el) return;
+
+  const onScreen = isWorldPointNearViewport(scout.x,scout.y,190);
+  if(!onScreen){
+    if(!scout._culled){
+      scout.el.style.visibility = 'hidden';
+      if(scout.timerEl) scout.timerEl.style.visibility = 'hidden';
+      scout._culled = true;
+    }
+    return;
+  }
+
+  if(scout._culled){
+    scout.el.style.visibility = 'visible';
+    if(scout.timerEl) scout.timerEl.style.visibility = 'visible';
+    scout._culled = false;
+  }
+
+  // Вся корабельная графика (кроме спутника-разведчика) нарисована носом вверх.
+  // Математический угол движения 0° смотрит вправо, поэтому для изображений кораблей
+  // нужен постоянный визуальный поворот +90°. Направление берём прежде всего из
+  // реального вектора движения — так корабль корректно смотрит вперёд при перелёте,
+  // патруле, погоне, возвращении с добычи и движении по орбите.
+  let travelAngle = Number.isFinite(scout._headingDeg) ? scout._headingDeg : null;
+
+  if(travelAngle === null && scout.combatTarget && !scout.combatTarget.destroyed){
+    travelAngle = Math.atan2(
+      scout.combatTarget.y - scout.y,
+      scout.combatTarget.x - scout.x
+    ) * 180 / Math.PI;
+  }else if(travelAngle === null && scout.targetPoint){
+    travelAngle = Math.atan2(
+      scout.targetPoint.y - scout.y,
+      scout.targetPoint.x - scout.x
+    ) * 180 / Math.PI;
+  }else if(travelAngle === null && scout.targetPlanet){
+    travelAngle = Math.atan2(
+      scout.targetPlanet.y - scout.y,
+      scout.targetPlanet.x - scout.x
+    ) * 180 / Math.PI;
+  }else if(travelAngle === null && scout.orbitPlanet){
+    travelAngle = (scout.orbitAngle * 180 / Math.PI) +
+      (scout.orbitDirection > 0 ? 90 : -90);
+  }
+
+  let angle = (travelAngle ?? 0) + (scout.type === 'scout' ? 0 : 90);
+
+  if(scout.orbitPlanet){
+    const nextZ = Math.sin(scout.orbitAngle) > 0 ? '5' : '1';
+    if(scout._lastZ !== nextZ){
+      scout.el.style.zIndex = nextZ;
+      scout._lastZ = nextZ;
+    }
+  }
+
+  if(!scout._gpuInit){
+    scout.el.style.left = '0px';
+    scout.el.style.top = '0px';
+    scout.el.style.willChange = 'transform';
+    if(scout.timerEl){
+      scout.timerEl.style.left = '0px';
+      scout.timerEl.style.top = '0px';
+      scout.timerEl.style.willChange = 'transform';
+    }
+    scout._gpuInit = true;
+  }
+
+  const transform =
+    'translate3d(' + scout.x.toFixed(2) + 'px,' + scout.y.toFixed(2) +
+    'px,0) translate(-50%,-50%) rotate(' + angle.toFixed(1) + 'deg)';
+
+  if(scout._lastTransform !== transform){
+    scout.el.style.transform = transform;
+    scout._lastTransform = transform;
+  }
+
+  if(!scout.timerEl) return;
+
+  if(scout.scanState){
+    scout.timerEl.classList.remove('battery');
+    scout.timerEl.style.display = 'block';
+    scout.timerEl.style.transform =
+      'translate3d(' + scout.x.toFixed(2) + 'px,' + (scout.y-16).toFixed(2) +
+      'px,0) translate(-50%,-100%)';
+
+    const value = Math.max(0,Math.ceil(scout.scanState.remaining)) + 'с';
+    if(scout._timerContent !== value){
+      scout.timerEl.textContent = value;
+      scout._timerContent = value;
+    }
+  }else if(scout.cooldownState){
+    scout.timerEl.classList.add('battery');
+    scout.timerEl.style.display = 'block';
+    scout.timerEl.style.transform =
+      'translate3d(' + scout.x.toFixed(2) + 'px,' + (scout.y-16).toFixed(2) +
+      'px,0) translate(-50%,-100%)';
+
+    const total = Math.max(1,scout.cooldownState.total || 120);
+    const remaining = Math.max(0,scout.cooldownState.remaining);
+    const chargePercent = Math.max(0,Math.min(100,Math.round((1-remaining/total)*100)));
+
+    if(scout._batteryPercent !== chargePercent){
+      const chargeClass = chargePercent < 20 ? 'low' : (chargePercent < 50 ? 'mid' : '');
+      scout.timerEl.innerHTML =
+        '<div class="batteryChargeIndicator">' +
+          '<span class="batteryShell">' +
+            '<span class="batteryFill ' + chargeClass + '" style="width:' + chargePercent + '%"></span>' +
+          '</span>' +
+          '<span class="batteryPercent">' + chargePercent + '%</span>' +
+        '</div>';
+      scout._batteryPercent = chargePercent;
+      scout._timerContent = null;
+    }
+  }else{
+    if(scout.timerEl.style.display !== 'none') scout.timerEl.style.display = 'none';
+    scout._timerContent = null;
+    scout._batteryPercent = null;
+  }
+}
+
+function beginOrbit(scout, planet){
+  scout.targetPlanet = null;
+  scout.orbitPlanet = planet;
+  scout.orbitAngle = Math.atan2(
+    (scout.y - planet.y) / 0.62,
+    scout.x - planet.x
+  );
+
+  if(!Number.isFinite(scout.orbitAngle)){
+    scout.orbitAngle = Math.random() * Math.PI * 2;
+  }
+
+  placeScoutOnOrbit(scout);
+  updateScoutElement(scout);
+}
+
+
+
+function activePlanetScanners(planet, owner){
+  return scouts.filter(s =>
+    !s.destroyed &&
+    s.owner === owner &&
+    s.scanState &&
+    s.scanState.planet === planet
+  );
+}
+
+function syncPlanetScanState(scanners){
+  if(!scanners.length) return;
+  const remaining = Math.min(...scanners.map(s => s.scanState.remaining));
+  const revealed = Math.max(...scanners.map(s => s.scanState.revealed || 0));
+  scanners.forEach(s => {
+    s.scanState.remaining = remaining;
+    s.scanState.revealed = revealed;
+  });
+}
+
+function startPlanetScan(scout, planet){
+  if(!scout.canScan || planet.kind === 'researchAsteroid'){
+    scout.scanState = null;
+    return;
+  }
+
+  if(scout.owner === 'player'){
+    if(planet.playerScanned){
+      scout.scanState = null;
+      return;
+    }
+
+    const alreadyScanning = activePlanetScanners(planet, 'player').filter(s => s !== scout);
+    const sharedRemaining = alreadyScanning.length
+      ? Math.min(...alreadyScanning.map(s => s.scanState.remaining))
+      : 60;
+    const sharedRevealed = alreadyScanning.length
+      ? Math.max(...alreadyScanning.map(s => s.scanState.revealed || 0))
+      : 0;
+
+    scout.scanState = {
+      planet,
+      total:60,
+      remaining:sharedRemaining,
+      revealed:sharedRevealed
+    };
+
+    const count = alreadyScanning.length + 1;
+    if(count === 1){
+      pushEvent(
+        scout.name + ': начато изучение неизвестной планеты. Полное сканирование займёт 60 сек.',
+        'discovery'
+      );
+    }else{
+      pushEvent(
+        scout.name + ' присоединился к исследованию. Разведчиков у планеты: ' + count +
+        '. Скорость сканирования ×' + count + '.',
+        'discovery'
+      );
+    }
+  }else{
+    if(enemyVisitedPlanetIds.has(planet.id)){
+      scout.scanState = null;
+      scout.idleTimer = 8;
+      return;
+    }
+
+    const alreadyScanning = activePlanetScanners(planet, 'enemy').filter(s => s !== scout);
+    const sharedRemaining = alreadyScanning.length
+      ? Math.min(...alreadyScanning.map(s => s.scanState.remaining))
+      : 60;
+    const sharedRevealed = alreadyScanning.length
+      ? Math.max(...alreadyScanning.map(s => s.scanState.revealed || 0))
+      : 0;
+
+    scout.scanState = {
+      planet,
+      total:60,
+      remaining:sharedRemaining,
+      revealed:sharedRevealed
+    };
+  }
+}
+
+function completePlayerScan(scout, planet){
+  planet.playerScanned = true;
+  planet.playerDiscoveredResources = [...planet.resources];
+  updatePlanetMapData(planet);
+
+  pushEvent(
+    'Изучение завершено: «' + planet.name + '». Планета ' + planetSuitabilityText(planet) + '.',
+    'success'
+  );
+
+  if(planet.habitable){
+    pushEvent(
+      'На «' + planet.name + '» в будущем можно будет доставить население и основать колонию.',
+      'success'
+    );
+  }else{
+    pushEvent(
+      'На «' + planet.name + '» можно будет строить автоматизированные шахты и другую добывающую инфраструктуру.',
+      'discovery'
+    );
+  }
+
+  if(currentFleetPlanet === planet && planetFleetOverlay.classList.contains('open')){
+    openPlanetFleetMenu(planet);
+  }
+
+  if(currentInfoPlanet === planet && planetInfoOverlay.classList.contains('open')){
+    openPlanetInfo(planet);
+  }
+}
+
+
+function startScoutCooldown(scout){
+  if(!scout || scout.type !== 'scout') return;
+  scout.cooldownState = {remaining:120,total:120};
+
+  if(scout.owner === 'player'){
+    pushEvent(
+      scout.name + ': исследование завершено. Начата зарядка солнечных батарей — 120 сек.',
+      'discovery'
+    );
+  }
+}
+
+function updateScoutCooldown(scout, dtGame){
+  if(!scout.cooldownState) return;
+  scout.cooldownState.remaining = Math.max(0, scout.cooldownState.remaining - dtGame);
+
+  if(scout.cooldownState.remaining <= 0){
+    scout.cooldownState = null;
+    if(scout.owner === 'player'){
+      pushEvent(scout.name + ': батареи заряжены. Разведчик снова готов к полёту.', 'success');
+    }else{
+      scout.idleTimer = .5;
+    }
+  }
+}
+
+function updatePlanetScan(scout, dtGame){
+  const scan = scout.scanState;
+  if(!scan) return;
+
+  const planet = scan.planet;
+
+  // Если другой разведчик уже закончил сканирование этой планеты,
+  // этот участник тоже завершает работу и уходит на перезарядку.
+  if(scout.owner === 'player' && planet.playerScanned){
+    scout.scanState = null;
+    startScoutCooldown(scout);
+    return;
+  }
+
+  const scanners = activePlanetScanners(planet, scout.owner);
+  if(!scanners.length) return;
+
+  // Сканирование общее для всех разведчиков у одной планеты.
+  // Обновляет прогресс только первый активный разведчик, чтобы один кадр
+  // не засчитывался несколько раз. Скорость равна числу разведчиков.
+  const leader = scanners[0];
+  if(leader !== scout) return;
+
+  syncPlanetScanState(scanners);
+
+  const speedMultiplier = scanners.length;
+  const sharedScan = leader.scanState;
+  sharedScan.remaining = Math.max(0, sharedScan.remaining - dtGame * speedMultiplier);
+
+  scanners.forEach(s => {
+    s.scanState.remaining = sharedScan.remaining;
+  });
+
+  const elapsed = sharedScan.total - sharedScan.remaining;
+
+  if(scout.owner === 'player'){
+    const resourceCount = planet.resources.length;
+    let revealed = Math.max(
+      sharedScan.revealed || 0,
+      planet.playerDiscoveredResources.length
+    );
+
+    while(revealed < resourceCount){
+      const threshold = 50 * (revealed + 1) / resourceCount;
+      if(elapsed < threshold) break;
+
+      const resource = planet.resources[revealed];
+      if(!planet.playerDiscoveredResources.includes(resource)){
+        planet.playerDiscoveredResources.push(resource);
+        pushEvent(
+          'Исследование «' + planet.name + '»: обнаружен ресурс — ' + resource + '.',
+          'resource'
+        );
+      }
+      revealed++;
+    }
+
+    scanners.forEach(s => {
+      if(s.scanState) s.scanState.revealed = revealed;
+    });
+  }
+
+  if(sharedScan.remaining <= 0){
+    // Все разведчики, участвовавшие в совместном исследовании,
+    // получают обычный двухминутный кулдаун после завершения.
+    scanners.forEach(s => {
+      s.scanState = null;
+    });
+
+    if(scout.owner === 'player'){
+      completePlayerScan(scout, planet);
+      scanners.forEach(startScoutCooldown);
+    }else{
+      enemyVisitedPlanetIds.add(planet.id);
+      scanners.forEach(startScoutCooldown);
+    }
+  }
+}
+
+function clearScoutSelection(){
+  selectedScout = null;
+  scouts.forEach(s => s.el.classList.remove('selected'));
+}
+
+function selectScout(scout){
+  clearSelectedFleet();
+  selectedScout = scout;
+  scouts.forEach(s => s.el.classList.toggle('selected', s === scout));
+
+  scoutCommandHint.textContent = 'Разведчик выбран. Нажмите на исследованную планету назначения.';
+  scoutCommandHint.classList.add('show');
+  clearTimeout(selectScout._timer);
+  selectScout._timer = setTimeout(() => scoutCommandHint.classList.remove('show'), 3500);
+}
+
+
+
+function fleetGroupMembers(group){
+  if(!group) return [];
+  const live = [];
+  const ids = [];
+  for(const id of group.shipIds || []){
+    const ship = scouts.find(s => s.id === id && !s.destroyed && s.owner === 'player');
+    if(ship){ live.push(ship); ids.push(id); }
+  }
+  group.shipIds = ids;
+  return live;
+}
+function updateFleetGroupsBadge(){
+  const count = fleetGroups.length;
+  fleetGroupsBadge.textContent = String(count);
+  fleetGroupsBadge.style.display = count > 0 ? 'block' : 'none';
+}
+function cleanupFleetGroups(){
+  fleetGroups = fleetGroups.filter(g => fleetGroupMembers(g).length > 0);
+  updateFleetGroupsBadge();
+}
+function fleetGroupForShip(ship){
+  return ship ? fleetGroups.find(g => (g.shipIds || []).includes(ship.id)) || null : null;
+}
+function fleetGroupLabel(group){ return group ? 'Группа ' + group.name : ''; }
+
+function removeShipFromFleetGroups(shipId){
+  let changed = false;
+  for(const group of fleetGroups){
+    const before = group.shipIds.length;
+    group.shipIds = group.shipIds.filter(id => id !== shipId);
+    if(before !== group.shipIds.length) changed = true;
+  }
+  if(changed){
+    cleanupFleetGroups();
+    if(fleetGroupsOverlay.classList.contains('open')) renderFleetGroupsPanel();
+  }
+}
+function nextFleetGroupName(){
+  const base = FLEET_GROUP_NAMES[fleetGroupSerial % FLEET_GROUP_NAMES.length];
+  const cycle = Math.floor(fleetGroupSerial / FLEET_GROUP_NAMES.length);
+  fleetGroupSerial++;
+  return cycle ? base + '-' + (cycle+1) : base;
+}
+function groupStatusText(group){
+  const members = fleetGroupMembers(group);
+  if(!members.length) return 'Нет кораблей';
+  const combat = members.filter(s => s.combatTarget).length;
+  if(combat) return 'В бою: ' + combat + ' из ' + members.length;
+  if(members.every(s => s.patrolState)) return 'Вся группа патрулирует';
+
+  const target = members[0].targetPlanet;
+  if(target && members.every(s => s.targetPlanet === target)) return 'В пути к «' + target.name + '»';
+
+  const orbit = members[0].orbitPlanet;
+  if(orbit && members.every(s => s.orbitPlanet === orbit && !s.targetPlanet)) return 'На орбите «' + orbit.name + '»';
+
+  if(members.every(s => s.stationary)) return 'Группа остановлена';
+  const busy = members.filter(s => s.scanState || s.cooldownState || s.resourceTransport).length;
+  if(busy) return 'Разные задачи • занято: ' + busy;
+  return 'Разделена • разные приказы';
+}
+function createFleetGroup(ships){
+  const valid = [...new Set((ships || []).filter(s => s && s.owner === 'player' && !s.destroyed))];
+  if(valid.length < 2){
+    pushEvent('Для группы флота выберите минимум два корабля.', 'discovery');
+    return null;
+  }
+  if(fleetGroups.length >= 8){
+    pushEvent('Можно иметь максимум 8 постоянных групп флота.', 'discovery');
+    return null;
+  }
+
+  const ids = new Set(valid.map(s => s.id));
+  for(const group of fleetGroups) group.shipIds = group.shipIds.filter(id => !ids.has(id));
+  cleanupFleetGroups();
+
+  const serialBefore = fleetGroupSerial;
+  const group = {
+    id:'fleet-group-' + Date.now() + '-' + Math.floor(Math.random()*10000),
+    name:nextFleetGroupName(),
+    colorIndex:serialBefore % 6,
+    shipIds:valid.map(s => s.id)
+  };
+  fleetGroups.push(group);
+  updateFleetGroupsBadge();
+  pushEvent(fleetGroupLabel(group) + ' создана. Кораблей: ' + valid.length + '.', 'success');
+  return group;
+}
+function createFleetGroupFromPlanetSelection(){
+  const ships = scouts.filter(s => infoSelectedShipIds.has(s.id) && s.owner === 'player' && !s.destroyed);
+  const group = createFleetGroup(ships);
+  if(!group) return;
+
+  infoSelectedShipIds = new Set();
+  updatePlanetTravelButton();
+
+  if(currentInfoPlanet){
+    const p = currentInfoPlanet;
+    closePlanetInfo();
+    openPlanetInfo(p);
+  }
+
+  scoutCommandHint.textContent =
+    fleetGroupLabel(group) + ' создана. Открывайте группы кнопкой ⌘ внизу.';
+  scoutCommandHint.classList.add('show');
+  clearTimeout(createFleetGroupFromPlanetSelection._timer);
+  createFleetGroupFromPlanetSelection._timer =
+    setTimeout(()=>scoutCommandHint.classList.remove('show'),3800);
+}
+function selectFleetGroupForTarget(group){
+  const members = fleetGroupMembers(group);
+  const available = members.filter(s =>
+    !s.scanState && !s.cooldownState && !s.resourceTransport && !s.destroyed
+  );
+  if(!available.length){
+    pushEvent(fleetGroupLabel(group) + ': сейчас нет свободных кораблей для нового приказа.', 'discovery');
+    return;
+  }
+  chooseFleetForTravel(available);
+  closeFleetGroupsPanel();
+
+  const excluded = members.length - available.length;
+  scoutCommandHint.textContent =
+    fleetGroupLabel(group) + ': выбрано ' + available.length + ' корабл.' +
+    (excluded ? ' • занято ' + excluded : '') +
+    '. Нажмите на планету' + (available.every(s=>s.type!=='scout') ? ' или свободную точку.' : '.');
+  scoutCommandHint.classList.add('show');
+  clearTimeout(selectFleetGroupForTarget._timer);
+  selectFleetGroupForTarget._timer =
+    setTimeout(()=>scoutCommandHint.classList.remove('show'),4400);
+}
+function patrolFleetGroup(group){
+  let count = 0;
+  for(const ship of fleetGroupMembers(group)){
+    if(ship.scanState || ship.cooldownState || ship.resourceTransport) continue;
+    enablePatrol(ship); count++;
+  }
+  pushEvent(fleetGroupLabel(group) + ': патруль получили ' + count + ' корабл.', 'discovery');
+  renderFleetGroupsPanel();
+}
+function stopFleetGroup(group){
+  let count = 0;
+  for(const ship of fleetGroupMembers(group)){
+    if(ship.scanState || ship.cooldownState) continue;
+    stopShip(ship); count++;
+  }
+  pushEvent(fleetGroupLabel(group) + ': остановлено ' + count + ' корабл.', 'discovery');
+  renderFleetGroupsPanel();
+}
+function returnFleetGroup(group){
+  let count = 0;
+  for(const ship of fleetGroupMembers(group)){
+    if(ship.scanState || ship.cooldownState) continue;
+    if(ship.lastDepartureTarget || ship.resourceTransport){ returnShip(ship); count++; }
+  }
+  pushEvent(fleetGroupLabel(group) + ': возвращаются ' + count + ' корабл.', 'discovery');
+  renderFleetGroupsPanel();
+}
+function disbandFleetGroup(group){
+  const label = fleetGroupLabel(group);
+  fleetGroups = fleetGroups.filter(g => g !== group);
+  updateFleetGroupsBadge();
+  renderFleetGroupsPanel();
+  pushEvent(label + ' расформирована. Корабли остаются на своих позициях.', 'discovery');
+}
+function renderFleetGroupsPanel(){
+  cleanupFleetGroups();
+  if(!fleetGroups.length){
+    fleetGroupsList.innerHTML = `
+      <div class="fleetGroupsEmpty">
+        Групп пока нет.<br>На своей планете отметьте минимум два свободных корабля и создайте группу.
+      </div>`;
+    return;
+  }
+
+  fleetGroupsList.innerHTML = fleetGroups.map(group => {
+    const members = fleetGroupMembers(group);
+    const chips = members.slice(0,8).map(s => `<span class="fleetGroupMember">${s.name}</span>`).join('');
+    const more = members.length > 8 ? `<span class="fleetGroupMember">+${members.length-8} ещё</span>` : '';
+    return `
+      <div class="fleetGroupCard color-${group.colorIndex}" data-group-id="${group.id}">
+        <div class="fleetGroupTop">
+          <div>
+            <div class="fleetGroupName">${fleetGroupLabel(group)}</div>
+            <div class="fleetGroupStatus">${groupStatusText(group)}</div>
+          </div>
+          <div class="fleetGroupCount">${members.length} корабл.</div>
+        </div>
+        <div class="fleetGroupMembers">${chips}${more}</div>
+        <div class="fleetGroupActions">
+          <button class="fleetGroupAction primary groupTargetBtn" type="button">⌖ Задать цель</button>
+          <button class="fleetGroupAction groupPatrolBtn" type="button">◉ Патруль</button>
+          <button class="fleetGroupAction groupStopBtn" type="button">■ Стоп</button>
+          <button class="fleetGroupAction warn groupReturnBtn" type="button">↩ Возврат</button>
+          <button class="fleetGroupAction danger disband groupDisbandBtn" type="button">Расформировать группу</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  fleetGroupsList.querySelectorAll('.fleetGroupCard').forEach(card => {
+    const group = fleetGroups.find(g => g.id === card.dataset.groupId);
+    if(!group) return;
+    card.querySelector('.groupTargetBtn')?.addEventListener('click',()=>selectFleetGroupForTarget(group));
+    card.querySelector('.groupPatrolBtn')?.addEventListener('click',()=>patrolFleetGroup(group));
+    card.querySelector('.groupStopBtn')?.addEventListener('click',()=>stopFleetGroup(group));
+    card.querySelector('.groupReturnBtn')?.addEventListener('click',()=>returnFleetGroup(group));
+    card.querySelector('.groupDisbandBtn')?.addEventListener('click',()=>disbandFleetGroup(group));
+  });
+}
+function openFleetGroupsPanel(){ renderFleetGroupsPanel(); fleetGroupsOverlay.classList.add('open'); }
+function closeFleetGroupsPanel(){ fleetGroupsOverlay.classList.remove('open'); }
+
+fleetGroupsButton.addEventListener('click',openFleetGroupsPanel);
+fleetGroupsClose.addEventListener('click',closeFleetGroupsPanel);
+fleetGroupsOverlay.addEventListener('pointerdown',e=>{
+  if(e.target === fleetGroupsOverlay) closeFleetGroupsPanel();
+  else e.stopPropagation();
+});
+
+function clearSelectedFleet(){
+  selectedFleet = [];
+  scouts.forEach(s => {
+    if(s !== selectedScout) s.el.classList.remove('selected');
+  });
+}
+
+function markSelectedFleet(){
+  scouts.forEach(s => {
+    const selected = selectedFleet.includes(s) || s === selectedScout;
+    s.el.classList.toggle('selected', selected);
+  });
+}
+
+function chooseFleetForTravel(ships){
+  clearScoutSelection();
+  selectedFleet = ships.filter(s =>
+    s && s.owner === 'player' && !s.targetPlanet && !s.scanState && !s.cooldownState
+  );
+  markSelectedFleet();
+
+  if(selectedFleet.length){
+    const canPoint = selectedFleet.every(s => s.type !== 'scout');
+    scoutCommandHint.textContent = canPoint
+      ? 'Выбрано кораблей: ' + selectedFleet.length + '. Нажмите на планету или свободную точку карты.'
+      : 'Выбрано кораблей: ' + selectedFleet.length + '. Нажмите на планету назначения.';
+    scoutCommandHint.classList.add('show');
+    clearTimeout(chooseFleetForTravel._timer);
+    chooseFleetForTravel._timer = setTimeout(() => scoutCommandHint.classList.remove('show'), 4200);
+  }
+}
+
+function canFleetTargetPlanet(fleet, planet){
+  if(!fleet.length) return false;
+  if(fleet.some(ship => ship.scanState || ship.cooldownState)) return false;
+
+  if(planet.kind === 'researchAsteroid'){
+    return isExploredPoint(planet.x,planet.y) && fleet.some(ship => ship.canMineResearch);
+  }
+
+  if(isPlanetDiscovered(planet)) return true;
+
+  // В неизвестную систему весь отряд может идти за разведчиком,
+  // если хотя бы один выбранный разведчик способен обнаружить цель.
+  return fleet.some(ship => ship.canScan && canScoutTargetPlanet(ship,planet));
+}
+
+function sendSelectedFleetToPlanet(planet){
+  const fleet = [...selectedFleet];
+  if(!fleet.length) return;
+
+  if(!canFleetTargetPlanet(fleet, planet)){
+    scoutCommandHint.textContent =
+      'Эта планета слишком далеко от зоны обнаружения выбранного флота.';
+    scoutCommandHint.classList.add('show');
+    clearTimeout(sendSelectedFleetToPlanet._timer);
+    sendSelectedFleetToPlanet._timer = setTimeout(() => scoutCommandHint.classList.remove('show'), 2700);
+    return;
+  }
+
+  const allAlreadyHere = fleet.every(ship => ship.orbitPlanet === planet && !ship.targetPlanet);
+  if(allAlreadyHere){
+    clearSelectedFleet();
+    if(planet.kind === 'researchAsteroid'){
+      scoutCommandHint.textContent = 'Выбранные корабли уже находятся у этого астероида.';
+      scoutCommandHint.classList.add('show');
+      setTimeout(() => scoutCommandHint.classList.remove('show'), 2000);
+    }else{
+      openPlanetInfo(planet);
+    }
+    return;
+  }
+
+  let eta = 0;
+  fleet.forEach(ship => {
+    const distance = Math.hypot(planet.x - ship.x, planet.y - ship.y);
+    eta = Math.max(eta, Math.ceil(distance / Math.max(.1, ship.speed * gameSpeed)));
+    setScoutTarget(ship, planet, {silent:true});
+  });
+
+  const count = fleet.length;
+  clearSelectedFleet();
+  clearScoutSelection();
+  closePlanetInfo();
+
+  const targetName = planet.kind === 'researchAsteroid'
+    ? '«' + planet.name + '»'
+    : (planet.playerScanned ? '«' + planet.name + '»' : 'неизвестной планете');
+  scoutCommandHint.textContent =
+    'Флот (' + count + ') отправлен к ' + targetName + '. В пути примерно ' + eta + ' сек.';
+  scoutCommandHint.classList.add('show');
+  clearTimeout(sendSelectedFleetToPlanet._timer2);
+  sendSelectedFleetToPlanet._timer2 = setTimeout(() => scoutCommandHint.classList.remove('show'), 3600);
+
+  pushEvent(
+    'Флот из ' + count + ' корабл' + (count === 1 ? 'я' : 'ей') +
+    ' отправлен к ' + targetName + '. Расчётное время перелёта: ' + eta + ' сек.',
+    'discovery'
+  );
+}
+
+function setScoutTarget(scout, planet, options={}){
+  if(!scout || scout.owner !== 'player' && scout.owner !== 'enemy') return false;
+
+  if(scout.resourceTransport && !options.preserveTransport){
+    if(scout.owner === 'player' && !options.silent){
+      scoutCommandHint.textContent =
+        'Грузовой корабль выполняет доставку. Сначала завершите рейс или нажмите «Возврат».';
+      scoutCommandHint.classList.add('show');
+      setTimeout(()=>scoutCommandHint.classList.remove('show'),2600);
+    }
+    return false;
+  }
+
+  if(
+    planet &&
+    planet.kind === 'researchAsteroid' &&
+    scout.owner === 'player' &&
+    scout.canMineResearch
+  ){
+    if(scout.orbitPlanet && scout.orbitPlanet.kind !== 'researchAsteroid'){
+      scout.homePlanet = scout.orbitPlanet;
+    }
+    if(getAsteroidMinerCount(planet, scout) >= 2){
+      if(!options.silent){
+        scoutCommandHint.textContent = 'На одном астероиде могут работать только 2 добывающих корабля.';
+        scoutCommandHint.classList.add('show');
+        setTimeout(() => scoutCommandHint.classList.remove('show'), 2600);
+      }
+      pushEvent('Для астероида уже назначено максимальное число добытчиков (2).', 'discovery');
+      return false;
+    }
+  }
+
+  if(
+    planet &&
+    planet.kind !== 'researchAsteroid' &&
+    planet.owner === 'neutral' &&
+    !planet.habitable &&
+    scout.owner === 'player' &&
+    scout.canMinePlanet
+  ){
+    if(!planet.playerScanned){
+      if(!options.silent){
+        scoutCommandHint.textContent = 'Сначала полностью исследуйте эту планету разведчиком.';
+        scoutCommandHint.classList.add('show');
+        setTimeout(() => scoutCommandHint.classList.remove('show'), 2600);
+      }
+      return false;
+    }
+    if(scout.orbitPlanet && scout.orbitPlanet.owner === 'player'){
+      scout.homePlanet = scout.orbitPlanet;
+    }
+    if(getPlanetMinerCount(planet, scout) >= 2){
+      if(!options.silent){
+        scoutCommandHint.textContent = 'На этой планете уже работают 2 грузовых корабля.';
+        scoutCommandHint.classList.add('show');
+        setTimeout(() => scoutCommandHint.classList.remove('show'), 2600);
+      }
+      pushEvent('Для «' + planet.name + '» уже назначено максимальное число грузовых кораблей (2).', 'discovery');
+      return false;
+    }
+  }
+
+  if(scout.cooldownState){
+    if(scout.owner === 'player'){
+      scoutCommandHint.textContent = 'Разведчик заряжает солнечные батареи. Осталось ' + Math.ceil(scout.cooldownState.remaining) + ' сек.'; 
+      scoutCommandHint.classList.add('show');
+      setTimeout(() => scoutCommandHint.classList.remove('show'), 2400);
+    }
+    return;
+  }
+
+  if(scout.scanState){
+    if(scout.owner === 'player'){
+      scoutCommandHint.textContent = 'Разведчик ещё изучает текущую планету. Дождитесь окончания таймера.';
+      scoutCommandHint.classList.add('show');
+      setTimeout(() => scoutCommandHint.classList.remove('show'), 2200);
+    }
+    return;
+  }
+
+  if(scout.orbitPlanet === planet && !scout.targetPlanet) return;
+
+  if(scout.owner === 'enemy' && scout.targetPlanet){
+    enemyReservedPlanetIds.delete(scout.targetPlanet.id);
+  }
+
+  if(!options.preserveAnomaly) releaseShipSignalAssignment(scout);
+  if(scout.orbitPlanet) scout.lastDepartureTarget = scout.orbitPlanet;
+  scout.orbitPlanet = null;
+  scout.targetPoint = null; clearWaypointMarker(scout);
+  if(!options.preserveMining) scout.researchMining = null;
+  if(!options.preservePlanetMining){
+    scout.planetMining = null;
+    scout.planetMiningCargo = {};
+  }
+  scout.stationary = false;
+  scout.autoPatrolPlanet = null;
+  scout.patrolState = null;
+  scout.combatTarget = null;
+  removePatrolVisual(scout);
+  scout.targetPlanet = planet;
+
+  if(scout.owner === 'enemy'){
+    enemyReservedPlanetIds.add(planet.id);
+  }else if(!options.silent){
+    const distance = Math.hypot(planet.x - scout.x, planet.y - scout.y);
+    const etaSeconds = Math.max(1, Math.ceil(distance / Math.max(0.1, scout.speed * gameSpeed)));
+
+    clearSelectedFleet();
+    clearScoutSelection();
+    closePlanetFleetMenu();
+    closePlanetInfo();
+
+    const targetName = planet.kind === 'researchAsteroid'
+      ? '«' + planet.name + '»'
+      : (planet.playerScanned ? '«' + planet.name + '»' : 'неизвестной планете');
+    scoutCommandHint.textContent =
+      scout.name + ' отправлен к ' + targetName + '. В пути примерно ' + etaSeconds + ' сек.';
+    scoutCommandHint.classList.add('show');
+    clearTimeout(setScoutTarget._timer);
+    setScoutTarget._timer = setTimeout(() => scoutCommandHint.classList.remove('show'), 3200);
+
+    pushEvent(
+      scout.name + ' отправлен к ' + targetName + '. Расчётное время полёта: ' + etaSeconds + ' сек.',
+      'discovery'
+    );
+  }
+  return true;
+}
+
+function chooseEnemyScoutTarget(scout){
+  const candidates = planets
+    .filter(p => p.owner === 'neutral')
+    .filter(p => !enemyVisitedPlanetIds.has(p.id))
+    .filter(p => !enemyReservedPlanetIds.has(p.id))
+    .sort((a,b) => Math.hypot(a.x-scout.x,a.y-scout.y) - Math.hypot(b.x-scout.x,b.y-scout.y));
+
+  if(candidates.length){
+    setScoutTarget(scout, candidates[0]);
+  }
+}
+
+function spawnInitialScouts(){
+  scouts.splice(0, scouts.length);
+  scoutLayer.innerHTML = '';
+
+  // Стартовый флот игрока: 2 спутника-разведчика + 1 перехватчик.
+  makeScout('player', playerPlanet, 1, Math.PI * 0.15);
+  makeScout('player', playerPlanet, 2, Math.PI * 1.15);
+  const playerInterceptor = makeBuiltShip('player', playerPlanet, 'interceptor');
+  playerInterceptor.orbitAngle = Math.PI * 1.72;
+  placeScoutOnOrbit(playerInterceptor);
+
+  // У противника такие же стартовые условия.
+  const e1 = makeScout('enemy', enemyPlanet, 1, Math.PI * 0.25);
+  const e2 = makeScout('enemy', enemyPlanet, 2, Math.PI * 1.25);
+  const enemyInterceptor = makeBuiltShip('enemy', enemyPlanet, 'interceptor');
+  enemyInterceptor.orbitAngle = Math.PI * 1.72;
+  placeScoutOnOrbit(enemyInterceptor);
+
+  // Бот сам отдаёт приказы своим разведчикам.
+  e1.idleTimer = Math.max(1.5,enemyScoutDecisionDelay()*.32);
+  e2.idleTimer = Math.max(2.5,enemyScoutDecisionDelay()*.56);
+
+  clearScoutSelection();
+}
+
+
+function menuFacility(icon, name, desc, state='Позже', stateClass=''){
+  return `
+    <div class="planetFacility">
+      <div class="facilityIcon">${icon}</div>
+      <div class="facilityText">
+        <div class="facilityName">${name}</div>
+        <div class="facilityDesc">${desc}</div>
+      </div>
+      <div class="facilityState ${stateClass}">${state}</div>
+    </div>
+  `;
+}
+
+
+
+
+
+
+const INFRA_UPGRADE_TYPES = new Set([
+  'foodFarm','waterPlant','habitat','clinic','entertainment','securityCenter'
+]);
+
+const MAX_INFRA_UPGRADE = 3;      // +25%, +50%, +75%
+const MAX_SCIENCE_LEVEL = 3;      // 10%, 20%, 30%
+const MAX_MINING_LEVEL = 10;      // базовая станция = Ур.1, максимум Ур.10
+const MINING_PRODUCTION_PER_LEVEL = .30; // +30% добычи за каждый новый уровень
+const MINING_UPGRADE_COST_STEP = .25; // каждый следующий уровень добавляет +25% от базовой цены
+
+function ensurePlanetUpgradeState(planet){
+  if(!planet.upgrades){
+    planet.upgrades = {
+      foodFarm:0,waterPlant:0,habitat:0,clinic:0,entertainment:0,securityCenter:0,
+      scienceCenter:0
+    };
+  }
+  if(!planet.upgradeQueues) planet.upgradeQueues = {};
+}
+
+function isMiningBuildingType(type){
+  const def = BUILDING_DEFS[type];
+  return !!(def?.resource && def?.production);
+}
+
+function miningStationLevel(planet,type){
+  if(!planet || (planet.buildings?.[type] || 0) <= 0) return 0;
+  ensurePlanetUpgradeState(planet);
+  return 1 + Math.max(0,planet.upgrades[type] || 0);
+}
+
+function miningProductionMultiplier(planet,type){
+  const level = miningStationLevel(planet,type);
+  if(level <= 0) return 0;
+  return 1 + (level - 1) * MINING_PRODUCTION_PER_LEVEL;
+}
+
+function miningUpgradeCost(type,currentUpgradeCount){
+  const def = BUILDING_DEFS[type];
+  if(!def) return {};
+
+  // Плавный линейный рост вместо экспоненциального:
+  // Ур.1 → Ур.2 = ×1.25, Ур.3 = ×1.50 ... Ур.10 = ×3.25 от базовой цены.
+  const factor = 1 + MINING_UPGRADE_COST_STEP * (currentUpgradeCount + 1);
+  const result = {};
+  for(const [resource,amount] of Object.entries(def.cost || {})){
+    result[resource] = Math.max(
+      5,
+      Math.ceil((amount * factor) / 5) * 5
+    );
+  }
+  return result;
+}
+
+function miningUpgradeDuration(type,currentUpgradeCount){
+  const def = BUILDING_DEFS[type];
+  const base = Math.max(20,def?.time || 30);
+  return Math.ceil(base * (1.35 + currentUpgradeCount * .42));
+}
+
+function infrastructureMultiplier(planet,type){
+  ensurePlanetUpgradeState(planet);
+  const level = Math.max(0,planet.upgrades[type] || 0);
+  return 1 + level * .25;
+}
+
+function infrastructureBonusText(planet,type){
+  const level = planet.upgrades?.[type] || 0;
+  return '+' + (level * 25) + '%';
+}
+
+function scaledUpgradeCost(type,currentLevel){
+  const def = BUILDING_DEFS[type];
+  if(!def) return {};
+  const factors = [0.70,1.25,2.05];
+  const factor = factors[Math.min(currentLevel,factors.length-1)];
+  const result = {};
+  for(const [resource,amount] of Object.entries(def.cost || {})){
+    result[resource] = Math.max(5,Math.ceil(amount * factor / 5) * 5);
+  }
+  return result;
+}
+
+function upgradeDuration(type,currentLevel){
+  if(type === 'scienceCenter') return [65,95][Math.min(currentLevel,1)];
+  return [40,65,95][Math.min(currentLevel,2)];
+}
+
+function scienceCenterLevel(planet){
+  if(!planet || (planet.buildings?.scienceCenter || 0) <= 0) return 0;
+  ensurePlanetUpgradeState(planet);
+  return 1 + (planet.upgrades.scienceCenter || 0);
+}
+
+function scienceCenterBonus(planet){
+  return scienceCenterLevel(planet) * .10 + civilizationScienceBonus(planet);
+}
+
+function globalScienceBonus(){
+  let bonus = 0;
+  planets.forEach(p => {
+    if(p.owner === 'player') bonus += scienceCenterBonus(p);
+  });
+  return Math.min(1,bonus); // максимум +100%
+}
+
+function researchSpeedMultiplier(){
+  return 1 + globalScienceBonus();
+}
+
+function scienceUpgradeCost(planet){
+  const level = scienceCenterLevel(planet);
+  if(level === 1) return {'Железо':220,'Медь':120,'Литий':60,'Алюминий':35};
+  if(level === 2) return {'Железо':360,'Медь':180,'Литий':90,'Алюминий':60};
+  return {};
+}
+
+function startInfrastructureUpgrade(planet,type){
+  if(!planet || planet.owner !== 'player') return;
+  ensurePlanetUpgradeState(planet);
+
+  const buildingCount = planet.buildings?.[type] || 0;
+  if(buildingCount <= 0){
+    pushEvent('Сначала постройте «' + (BUILDING_DEFS[type]?.name || type) + '».', 'discovery');
+    return;
+  }
+
+  if(planet.upgradeQueues[type]) return;
+
+  const current = planet.upgrades[type] || 0;
+  const max = type === 'scienceCenter' ? 2 : MAX_INFRA_UPGRADE;
+  if(current >= max) return;
+
+  const cost = type === 'scienceCenter'
+    ? scienceUpgradeCost(planet)
+    : scaledUpgradeCost(type,current);
+
+  if(!spendCost(planet,cost)){
+    pushEvent('Недостаточно ресурсов для улучшения «' + BUILDING_DEFS[type].name + '».', 'discovery');
+    return;
+  }
+
+  const duration = upgradeDuration(type,current);
+  planet.upgradeQueues[type] = {
+    type,
+    cost:{...cost},
+    remaining:duration,
+    total:duration
+  };
+
+  pushEvent('Начато улучшение «' + BUILDING_DEFS[type].name + '» на «' + planet.name + '».', 'discovery');
+  if(currentFleetPlanet === planet) renderPlanetMenuTab(planet);
+}
+
+function cancelInfrastructureUpgrade(planet,type){
+  if(!planet?.upgradeQueues?.[type]) return;
+  const q = planet.upgradeQueues[type];
+  refundCost(planet,q.cost || {});
+  delete planet.upgradeQueues[type];
+  pushEvent('Улучшение «' + BUILDING_DEFS[type].name + '» отменено. Ресурсы возвращены.', 'discovery');
+  if(currentFleetPlanet === planet) renderPlanetMenuTab(planet);
+}
+
+function infrastructureUpgradeCardHtml(planet,type){
+  ensurePlanetUpgradeState(planet);
+  const def = BUILDING_DEFS[type];
+  const count = planet.buildings?.[type] || 0;
+  if(count <= 0) return '';
+
+  const current = planet.upgrades[type] || 0;
+  const queue = planet.upgradeQueues[type];
+  const max = MAX_INFRA_UPGRADE;
+  const atMax = current >= max;
+  const nextBonus = Math.min(MAX_INFRA_UPGRADE,current+1)*25;
+  const cost = atMax ? {} : scaledUpgradeCost(type,current);
+
+  return `
+    <div class="infraUpgradeCard">
+      <div class="infraUpgradeHead">
+        <div>
+          <div class="infraUpgradeTitle">Улучшение: ${def.name}</div>
+          <div class="infraUpgradeLevel">
+            Текущий бонус: <b>+${current*25}%</b> к обеспечению
+          </div>
+        </div>
+        <div class="infraUpgradeBadge">Ур. ${current+1}/${MAX_INFRA_UPGRADE+1}</div>
+      </div>
+
+      ${atMax
+        ? `<div class="infraUpgradeMax">Максимальное улучшение • +${current*25}%</div>`
+        : `
+          <div class="infraUpgradeNext">Следующий уровень: <b>+${nextBonus}%</b> к обеспечению</div>
+          <div class="costLine">
+            ${Object.entries(cost).map(([r,a])=>resourceCostChipHtml(r,a)).join('')}
+          </div>
+          ${queue ? buildProgressHtml(queue,'Улучшение') : ''}
+          <div class="infraUpgradeActions">
+            ${queue
+              ? `<button class="cancelBuildBtn cancelInfraUpgradeBtn" data-upgrade="${type}">Отменить</button>`
+              : `<button class="buildBtn startInfraUpgradeBtn" data-upgrade="${type}" ${canAfford(planet,cost)?'':'disabled'}>Улучшить</button>`
+            }
+          </div>
+        `
+      }
+    </div>
+  `;
+}
+
+
+function startMiningUpgrade(planet,type){
+  if(!planet || planet.owner !== 'player' || !isMiningBuildingType(type)) return;
+  ensurePlanetUpgradeState(planet);
+
+  if((planet.buildings?.[type] || 0) <= 0){
+    pushEvent('Сначала постройте «' + BUILDING_DEFS[type].name + '».', 'discovery');
+    return;
+  }
+  if(planet.upgradeQueues[type]) return;
+
+  const currentUpgradeCount = Math.max(0,planet.upgrades[type] || 0);
+  const currentLevel = 1 + currentUpgradeCount;
+  if(currentLevel >= MAX_MINING_LEVEL) return;
+
+  const cost = miningUpgradeCost(type,currentUpgradeCount);
+  if(!spendCost(planet,cost)){
+    pushEvent(
+      'Недостаточно ресурсов для улучшения «' + BUILDING_DEFS[type].name +
+      '» до уровня ' + (currentLevel + 1) + '.',
+      'discovery'
+    );
+    return;
+  }
+
+  const duration = miningUpgradeDuration(type,currentUpgradeCount);
+  planet.upgradeQueues[type] = {
+    type,
+    kind:'mining',
+    cost:{...cost},
+    remaining:duration,
+    total:duration
+  };
+
+  pushEvent(
+    'Начато улучшение «' + BUILDING_DEFS[type].name + '»: Ур. ' +
+    currentLevel + ' → Ур. ' + (currentLevel + 1) + '.',
+    'discovery'
+  );
+
+  updateSelectedPlanetResourceBar(true);
+  if(currentFleetPlanet === planet) renderPlanetMenuTab(planet);
+}
+
+function cancelMiningUpgrade(planet,type){
+  if(!planet?.upgradeQueues?.[type]) return;
+  const q = planet.upgradeQueues[type];
+  refundCost(planet,q.cost || {});
+  delete planet.upgradeQueues[type];
+
+  pushEvent(
+    'Улучшение «' + BUILDING_DEFS[type].name + '» отменено. Ресурсы возвращены.',
+    'discovery'
+  );
+
+  updateSelectedPlanetResourceBar(true);
+  if(currentFleetPlanet === planet) renderPlanetMenuTab(planet);
+}
+
+function miningUpgradeCardHtml(planet,type){
+  if(!isMiningBuildingType(type) || (planet.buildings?.[type] || 0) <= 0) return '';
+  ensurePlanetUpgradeState(planet);
+
+  const def = BUILDING_DEFS[type];
+  const currentUpgradeCount = Math.max(0,planet.upgrades[type] || 0);
+  const currentLevel = 1 + currentUpgradeCount;
+  const nextLevel = Math.min(MAX_MINING_LEVEL,currentLevel + 1);
+  const atMax = currentLevel >= MAX_MINING_LEVEL;
+  const queue = planet.upgradeQueues[type];
+
+  const civMult = civilizationProductionMultiplier(planet);
+  const currentRate = def.production * miningProductionMultiplier(planet,type) * civMult;
+  const nextMultiplier = 1 + (nextLevel - 1) * MINING_PRODUCTION_PER_LEVEL;
+  const nextRate = def.production * nextMultiplier * civMult;
+  const cost = atMax ? {} : miningUpgradeCost(type,currentUpgradeCount);
+
+  return `
+    <div class="mineUpgradeCard">
+      <div class="mineUpgradeHead">
+        <div class="mineUpgradeResourceIcon">
+          ${resourceIconHtml(def.resource,'sm')}
+        </div>
+        <div class="mineUpgradeMain">
+          <div class="mineUpgradeTitle">${def.resource} • уровень станции ${currentLevel}</div>
+          <div class="mineUpgradeCurrent">
+            Добыча: <b>+${currentRate.toFixed(2)} ${def.resource}/с</b>
+          </div>
+        </div>
+        <div class="mineUpgradeBadge">УР. ${currentLevel}</div>
+      </div>
+
+      ${atMax
+        ? `<div class="mineUpgradeMax">Максимальный уровень станции достигнут</div>`
+        : `
+          <div class="mineUpgradeNext">
+            Улучшение до <b>уровня ${nextLevel}</b>:
+            +${Math.round(MINING_PRODUCTION_PER_LEVEL*100)}% базовой добычи
+            • будет <b>+${nextRate.toFixed(2)} ${def.resource}/с</b>
+          </div>
+
+          <div class="mineUpgradeCostTitle">
+            Стоимость уровня ${nextLevel}
+            <span>• каждый уровень +${Math.round(MINING_UPGRADE_COST_STEP * 100)}% от базовой цены</span>
+          </div>
+          <div class="costLine">
+            ${Object.entries(cost).map(([r,a])=>resourceCostChipHtml(r,a)).join('')}
+          </div>
+
+          ${queue ? buildProgressHtml(queue,'Модернизация станции') : ''}
+
+          <div class="mineUpgradeActions">
+            ${queue
+              ? `<button class="cancelBuildBtn cancelMineUpgradeBtn" data-mine-upgrade="${type}">Отменить</button>`
+              : `<button class="buildBtn startMineUpgradeBtn" data-mine-upgrade="${type}" ${canAfford(planet,cost)?'':'disabled'}>
+                  Улучшить до Ур. ${nextLevel}
+                </button>`
+            }
+          </div>
+        `
+      }
+    </div>
+  `;
+}
+
+function scienceCenterCardHtml(planet){
+  ensurePlanetUpgradeState(planet);
+  const count = planet.buildings?.scienceCenter || 0;
+  const level = scienceCenterLevel(planet);
+  const queue = planet.upgradeQueues.scienceCenter;
+
+  if(count <= 0){
+    return `
+      <div class="scienceCenterWrap">
+        ${buildingCardHtml(planet,'scienceCenter')}
+        <div class="scienceCenterNote">
+          После строительства Научный центр даст <b>+10%</b> к скорости всех исследований.
+        </div>
+      </div>
+    `;
+  }
+
+  const atMax = level >= MAX_SCIENCE_LEVEL;
+  const nextLevel = Math.min(MAX_SCIENCE_LEVEL,level+1);
+  const cost = atMax ? {} : scienceUpgradeCost(planet);
+
+  return `
+    <div class="scienceCenterCard">
+      <div class="scienceCenterHead">
+        <div class="scienceCenterIcon">⚛</div>
+        <div>
+          <div class="scienceCenterTitle">Научный центр</div>
+          <div class="scienceCenterDesc">
+            Уровень ${level} • +${level*10}% к глобальной скорости исследований
+          </div>
+        </div>
+      </div>
+
+      ${atMax
+        ? `<div class="infraUpgradeMax">Максимальный уровень • +30%</div>`
+        : `
+          <div class="scienceUpgradeNext">
+            Улучшение до уровня ${nextLevel}: <b>+${nextLevel*10}%</b>
+          </div>
+          <div class="costLine">
+            ${Object.entries(cost).map(([r,a])=>resourceCostChipHtml(r,a)).join('')}
+          </div>
+          ${queue ? buildProgressHtml(queue,'Улучшение Научного центра') : ''}
+          <div class="infraUpgradeActions">
+            ${queue
+              ? `<button class="cancelBuildBtn cancelInfraUpgradeBtn" data-upgrade="scienceCenter">Отменить</button>`
+              : `<button class="buildBtn startInfraUpgradeBtn" data-upgrade="scienceCenter" ${canAfford(planet,cost)?'':'disabled'}>Улучшить</button>`
+            }
+          </div>
+        `
+      }
+    </div>
+  `;
+}
+
+const POPULATION_NEEDS = {
+  food:{label:'Еда', icon:'🍽', building:'foodFarm', weight:1.35},
+  water:{label:'Вода', icon:'💧', building:'waterPlant', weight:1.45},
+  housing:{label:'Жильё', icon:'⌂', building:'habitat', weight:1.20},
+  medicine:{label:'Медицина', icon:'✚', building:'clinic', weight:.85},
+  entertainment:{label:'Развлечения', icon:'★', building:'entertainment', weight:.70},
+  security:{label:'Безопасность', icon:'◆', building:'securityCenter', weight:.80}
+};
+
+function populationNeedData(planet){
+  const population = Math.max(1, planet.population || 0);
+  const result = {};
+  for(const [key,need] of Object.entries(POPULATION_NEEDS)){
+    const def = BUILDING_DEFS[need.building];
+    const count = planet.buildings?.[need.building] || 0;
+    const capacity = count * (def.support || 0) * infrastructureMultiplier(planet,need.building);
+    const ratio = population <= 0 ? 1 : Math.min(1.15, capacity / population);
+    result[key] = {
+      ...need,
+      count,
+      capacity,
+      ratio,
+      percent:Math.round(Math.min(100,ratio*100))
+    };
+  }
+  return result;
+}
+
+function calculateSatisfaction(planet){
+  if(planet.owner !== 'player' && planet.owner !== 'enemy') return 0;
+  if((planet.population || 0) <= 0) return 0;
+
+  const needs = populationNeedData(planet);
+  let weighted = 0, totalWeight = 0;
+  for(const need of Object.values(needs)){
+    weighted += Math.min(1,need.ratio) * need.weight;
+    totalWeight += need.weight;
+  }
+
+  let score = totalWeight ? (weighted / totalWeight) * 100 : 0;
+
+  // Severe shortages of food/water are felt more strongly.
+  if(needs.food.ratio < .55) score -= (0.55 - needs.food.ratio) * 30;
+  if(needs.water.ratio < .55) score -= (0.55 - needs.water.ratio) * 35;
+  if(needs.housing.ratio < .65) score -= (0.65 - needs.housing.ratio) * 18;
+
+  return Math.max(0,Math.min(100,Math.round(score)));
+}
+
+function populationEfficiency(planet){
+  const s = calculateSatisfaction(planet);
+  if(s >= 80) return 1.05;
+  if(s >= 60) return 1;
+  if(s >= 40) return .90;
+  if(s >= 20) return .75;
+  return .55;
+}
+
+function populationGrowthPerMinute(planet){
+  const s = calculateSatisfaction(planet);
+  if(s >= 90) return .0060;   // +0.60% / min
+  if(s >= 80) return .0045;
+  if(s >= 60) return .0025;
+  if(s >= 40) return .0004;
+  if(s >= 20) return -.0015;
+  return -.0040;
+}
+
+function populationTrendText(planet){
+  const rate = populationGrowthPerMinute(planet);
+  if(rate > .003) return 'Быстрый рост';
+  if(rate > .0005) return 'Рост';
+  if(rate >= 0) return 'Стабильно';
+  if(rate > -.0025) return 'Снижение';
+  return 'Сильный отток';
+}
+
+function updatePopulation(planet, dtGame){
+  if(planet.owner !== 'player' || !planet.habitable || planet.population <= 0) return;
+
+  const old = planet.population;
+  const ratePerMinute = populationGrowthPerMinute(planet);
+  planet.population = Math.max(0, planet.population + planet.population * ratePerMinute * (dtGame/60));
+
+  // Avoid spamming: notify only on large threshold changes.
+  const oldBand = Math.floor(old / 250);
+  const newBand = Math.floor(planet.population / 250);
+  if(oldBand !== newBand && Math.abs(newBand-oldBand) >= 1){
+    pushEvent(
+      'Население «' + planet.name + '»: ' + Math.floor(planet.population).toLocaleString('ru-RU') +
+      ' • ' + populationTrendText(planet) + '.',
+      ratePerMinute >= 0 ? 'success' : 'alert'
+    );
+  }
+}
+
+function populationNeedBar(planet,key){
+  const d = populationNeedData(planet)[key];
+  const pct = d.percent;
+  const cls = pct >= 90 ? 'good' : pct >= 60 ? 'mid' : 'bad';
+  return `
+    <div class="populationNeed">
+      <div class="populationNeedTop">
+        <span class="populationNeedName">${d.icon} ${d.label}</span>
+        <span class="populationNeedValue ${cls}">${pct}%</span>
+      </div>
+      <div class="populationNeedTrack"><span class="${cls}" style="width:${pct}%"></span></div>
+      <div class="populationNeedMeta">
+        Поддержка: ${Math.floor(d.capacity).toLocaleString('ru-RU')} жителей • построено: ${d.count}
+      </div>
+    </div>
+  `;
+}
+
+function getProductionRate(planet, resource){
+  let total = 0;
+  for(const [type,def] of Object.entries(BUILDING_DEFS)){
+    if(def.resource === resource && def.production){
+      const count = planet.buildings?.[type] || 0;
+      if(count > 0){
+        total += count *
+          def.production *
+          miningProductionMultiplier(planet,type) *
+          civilizationProductionMultiplier(planet);
+      }
+    }
+  }
+  return total;
+}
+
+function setResourceBarPlanet(planet){
+  resourceBarPlanet = planet || null;
+  updateSelectedPlanetResourceBar();
+}
+
+
+
+function shipCategoryClass(category){
+  const map = {
+    'Лёгкие':'class-light',
+    'Тяжёлые':'class-heavy',
+    'Защитные':'class-defensive',
+    'Стратегические':'class-strategic',
+    'Транспортные':'class-logistic',
+    'Сервисные':'class-logistic',
+    'Сверхтяжёлые':'class-super'
+  };
+  return map[category] || 'class-light';
+}
+function shipTypeCategoryClass(type){
+  const def = SHIP_DEFS[type];
+  return shipCategoryClass(def?.category || '');
+}
+function renderTinyShipIcon(type, size='sm'){
+  if(type === 'scout'){
+    return `<span class="inlineShipIcon scout-inline ${size}">${renderSatelliteIcon(size === 'xs' ? 'size-inline-xs' : 'size-inline')}</span>`;
+  }
+  return `<span class="inlineShipIcon ${size}"><img src="${shipArt(type)}" alt=""></span>`;
+}
+function categoryLabel(category){
+  return `<span class="shipCategoryBadge ${shipCategoryClass(category)}">${category}</span>`;
+}
+
+
+function resourceVisualMeta(resource){
+  const key = String(resource).toLowerCase();
+  const map = {
+    'железо':   {cls:'iron', short:'Fe', shape:'ingot'},
+    'медь':     {cls:'copper', short:'Cu', shape:'ingot'},
+    'литий':    {cls:'lithium', short:'Li', shape:'cell'},
+    'никель':   {cls:'nickel', short:'Ni', shape:'ingot'},
+    'золото':   {cls:'gold', short:'Au', shape:'ingot'},
+    'серебро':  {cls:'silver', short:'Ag', shape:'ingot'},
+    'платина':  {cls:'platinum', short:'Pt', shape:'ingot'},
+    'алюминий': {cls:'aluminium', short:'Al', shape:'ingot'},
+    'кобальт':  {cls:'cobalt', short:'Co', shape:'ingot'},
+    'кальций':  {cls:'calcium', short:'Ca', shape:'crystal'},
+    'титан':    {cls:'titanium', short:'Ti', shape:'ingot'},
+    'свинец':   {cls:'lead', short:'Pb', shape:'ingot'},
+    'родий':    {cls:'rhodium', short:'Rh', shape:'ingot'},
+    'астат':    {cls:'astatine', short:'At', shape:'crystal'},
+    'осмий':    {cls:'osmium', short:'Os', shape:'ingot'},
+    'рутений':  {cls:'ruthenium', short:'Ru', shape:'ingot'},
+    'рений':    {cls:'rhenium', short:'Re', shape:'ingot'},
+    'пейнит':   {cls:'painite', short:'Pa', shape:'gem'},
+    'алмаз':    {cls:'diamond', short:'◆', shape:'gem'},
+    'торий':    {cls:'thorium', short:'Th', shape:'cell'},
+    'ксенит':   {cls:'xenite', short:'Xe', shape:'crystal'}
+  };
+  return map[key] || {cls:'generic', short:String(resource).slice(0,2).toUpperCase(), shape:'ingot'};
+}
+function resourceIconClass(resource){
+  return resourceVisualMeta(resource).cls;
+}
+function resourceIconLabel(resource){
+  return resourceVisualMeta(resource).short;
+}
+function resourceIconHtml(resource,size='sm'){
+  const meta = resourceVisualMeta(resource);
+  return `<span class="resourceMiniIcon ${meta.cls} ${meta.shape} ${size}"><span class="resourceMiniMark">${meta.short}</span></span>`;
+}
+function resourceCostChipHtml(resource, amount){
+  return `<span class="${costChipClassName(resource)}">${resourceIconHtml(resource,'xs')}<span>${resource} ${amount}</span></span>`;
+}
+function renderSatelliteIcon(sizeClass='size-card'){
+  return `
+    <span class="satelliteIcon ${sizeClass}">
+      <span class="satellitePanel left"></span>
+      <span class="satellitePanel right"></span>
+      <span class="satelliteBody"></span>
+      <span class="satelliteDish"></span>
+      <span class="satelliteWing"></span>
+      <span class="satelliteFlame"></span>
+    </span>
+  `;
+}
+
+function updateSelectedPlanetResourceBar(force=true){
+  const now = performance.now();
+  if(!force && now-PERF.resourceLast < PERF.resourceInterval) return;
+  PERF.resourceLast = now;
+  const planet = resourceBarPlanet;
+
+  if(!gameStarted || !planet || planet.owner !== 'player'){
+    selectedPlanetResourceBar.classList.remove('show');
+    return;
+  }
+
+  selectedResourceName.textContent = 'Имперский резерв';
+
+  const sprite = SPRITES[planet.styleKey];
+  selectedResourcePlanetIcon.style.backgroundImage = sprite?.src ? `url(${sprite.src})` : 'none';
+  selectedResourcePlanetIcon.style.backgroundColor = sprite?.src ? 'transparent' : 'rgba(58,96,145,.45)';
+
+  const priority = ['Железо','Медь','Литий','Никель','Титан','Платина'];
+  const empireKeys = empireResourceKeys();
+  const resources = [...new Set([
+    ...priority,
+    ...empireKeys
+  ])].filter(r => getStock(planet,r) > 0 || empireKeys.includes(r));
+
+  const resourceHtml = resources.map(resource => {
+    const value = Math.floor(getStock(planet,resource));
+    const prod = empireProductionRate(resource);
+    return `
+      <div class="selectedResourceItem">
+        ${resourceIconHtml(resource,'sm')}
+        <b>${value}</b>
+        ${prod > 0 ? `<span class="selectedResourceProd">+${prod.toFixed(2)}</span>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  if(updateSelectedPlanetResourceBar._html !== resourceHtml){
+    selectedResourceItems.innerHTML = resourceHtml;
+    updateSelectedPlanetResourceBar._html = resourceHtml;
+  }
+
+  selectedPlanetResourceBar.classList.add('show');
+}
+
+function localStock(planet, resource){
+  return Number(planet?.stockpile?.[resource] || 0);
+}
+function empireStock(resource){
+  let total = 0;
+  for(const colony of planets){
+    if(colony.owner === 'player') total += localStock(colony,resource);
+  }
+  return total;
+}
+function empireResourceKeys(){
+  const keys = new Set();
+  for(const colony of planets){
+    if(colony.owner !== 'player') continue;
+    Object.keys(colony.stockpile || {}).forEach(r=>keys.add(r));
+    (colony.resources || []).forEach(r=>keys.add(r));
+  }
+  return [...keys];
+}
+function empireProductionRate(resource){
+  return playerColonies().reduce((sum,colony)=>sum + getProductionRate(colony,resource),0);
+}
+function getStock(planet, resource){
+  // Все собственные колонии пользуются единым имперским резервом.
+  if(planet?.owner === 'player') return empireStock(resource);
+  return localStock(planet,resource);
+}
+function withdrawEmpireStock(resource, amount, preferredPlanet=null){
+  let remaining = Math.max(0,Number(amount || 0));
+  const ordered = playerColonies().slice();
+  if(preferredPlanet?.owner === 'player'){
+    ordered.sort((a,b)=>(a===preferredPlanet?-1:b===preferredPlanet?1:0));
+  }
+  for(const colony of ordered){
+    if(remaining <= 0) break;
+    if(!colony.stockpile) colony.stockpile = {};
+    const available = Math.max(0,localStock(colony,resource));
+    const take = Math.min(available,remaining);
+    if(take > 0){
+      colony.stockpile[resource] = available - take;
+      remaining -= take;
+    }
+  }
+  return remaining <= 0.000001;
+}
+function addStock(planet, resource, amount){
+  if(!planet) return;
+  if(!planet.stockpile) planet.stockpile = {};
+  const delta = Number(amount || 0);
+  if(planet.owner === 'player' && delta < 0){
+    withdrawEmpireStock(resource,-delta,planet);
+    return;
+  }
+  planet.stockpile[resource] = localStock(planet,resource) + delta;
+}
+function canAfford(planet, cost){
+  return Object.entries(cost).every(([res,amount]) => getStock(planet,res) >= amount);
+}
+function spendCost(planet, cost){
+  if(!canAfford(planet,cost)) return false;
+  Object.entries(cost).forEach(([res,amount]) => addStock(planet,res,-amount));
+  return true;
+}
+function formatCost(cost){
+  return Object.entries(cost).map(([r,a]) => `${r}: ${a}`).join(' • ');
+}
+function stockpileHtml(planet){
+  const important = ['Железо','Медь','Литий','Никель','Титан','Платина','Серебро'];
+  const sourceKeys = planet?.owner === 'player' ? empireResourceKeys() : Object.keys(planet.stockpile || {});
+  const keys = [...new Set([...sourceKeys, ...important])]
+    .filter(k => getStock(planet,k) > 0 || ['Железо','Медь','Литий'].includes(k));
+
+  const note = planet?.owner === 'player'
+    ? '<div class="empireStockNote">Общий резерв империи • ресурсы всех ваших колоний доступны здесь без ручной перевозки.</div>'
+    : '';
+  return note + `<div class="stockpileGrid">${
+    keys.map(r => {
+      const rate = planet?.owner === 'player' ? empireProductionRate(r) : getProductionRate(planet,r);
+      const prod = rate > 0
+        ? `<div class="stockProd">+${rate.toFixed(2)}/с</div>`
+        : '';
+      return `<div class="stockItem"><div class="stockName">${resourceIconHtml(r,'sm')}<span>${r}</span></div><div class="stockValue">${Math.floor(getStock(planet,r))}</div>${prod}</div>`;
+    }).join('')
+  }</div>`;
+}
+
+
+function refundCost(planet, cost){
+  Object.entries(cost || {}).forEach(([resource,amount]) => addStock(planet,resource,amount));
+  updateSelectedPlanetResourceBar();
+}
+
+function cancelBuilding(planet,type){
+  if(!planet?.buildingQueues?.[type]) return;
+  const def = BUILDING_DEFS[type];
+  delete planet.buildingQueues[type];
+  refundCost(planet,def.cost);
+  pushEvent('Строительство «' + def.name + '» отменено. Ресурсы возвращены.', 'discovery');
+  if(currentFleetPlanet === planet) renderPlanetMenuTab(planet);
+}
+
+function removeOneShipOrder(planet,type){
+  const q = planet.shipQueue;
+  if(!q) return false;
+  const def = SHIP_DEFS[type];
+  if(!def) return false;
+
+  if(Array.isArray(q.pending)){
+    for(let i=q.pending.length-1;i>=0;i--){
+      if(q.pending[i] === type){
+        q.pending.splice(i,1);
+        refundCost(planet,def.cost);
+        pushEvent('Из очереди удалён корабль «' + def.name + '». Ресурсы возвращены.', 'discovery');
+        if(currentFleetPlanet === planet) renderPlanetMenuTab(planet);
+        return true;
+      }
+    }
+  }
+
+  if(q.type === type){
+    const pending = Array.isArray(q.pending) ? q.pending : [];
+    const nextType = pending.length ? pending.shift() : null;
+    refundCost(planet,def.cost);
+    if(nextType){
+      const nextDef = SHIP_DEFS[nextType];
+      planet.shipQueue = {type:nextType,remaining:nextDef.time,total:nextDef.time,pending};
+    }else{
+      planet.shipQueue = null;
+    }
+    pushEvent('Строительство корабля «' + def.name + '» отменено. Ресурсы возвращены.', 'discovery');
+    if(currentFleetPlanet === planet) renderPlanetMenuTab(planet);
+    return true;
+  }
+  return false;
+}
+
+function techKey(name){
+  return String(name).toLowerCase().replace(/[^a-zа-яё0-9]+/gi,'-').replace(/^-|-$/g,'');
+}
+function researchDuration(level){ return 20 + level * 20; }
+function startTechnology(name,level,cost){
+  const key = techKey(name);
+  if(completedTechs.has(key)) return;
+  if(researchQueue){
+    pushEvent('Сначала завершите или отмените текущее исследование.', 'discovery');
+    return;
+  }
+  if(playerKsenit < cost){
+    pushEvent('Недостаточно Ксенита для исследования «' + name + '».', 'discovery');
+    return;
+  }
+  playerKsenit -= cost;
+  const duration = researchDuration(level);
+  researchQueue = {key,name,level,cost,total:duration,remaining:duration};
+  pushEvent('Начато исследование «' + name + '».', 'discovery');
+  if(currentPlanetTab === 'research' && currentFleetPlanet) renderResearchTab(currentFleetPlanet);
+}
+function cancelTechnology(){
+  if(!researchQueue) return;
+  playerKsenit += researchQueue.cost;
+  pushEvent('Исследование «' + researchQueue.name + '» отменено. Ксенит возвращён.', 'discovery');
+  researchQueue = null;
+  if(currentPlanetTab === 'research' && currentFleetPlanet) renderResearchTab(currentFleetPlanet);
+}
+function updateResearch(dtGame){
+  if(!researchQueue) return;
+  researchQueue.remaining -= dtGame * researchSpeedMultiplier();
+  if(researchQueue.remaining <= 0){
+    const done = researchQueue;
+    completedTechs.add(done.key);
+    researchQueue = null;
+    pushEvent('Исследование «' + done.name + '» завершено.', 'success');
+    if(currentPlanetTab === 'research' && currentFleetPlanet) renderResearchTab(currentFleetPlanet);
+  }
+}
+
+function startBuilding(planet, type){
+  const def = BUILDING_DEFS[type];
+  if(!def || planet.owner !== 'player') return;
+
+  const requiredCivilizationLevel = requiredCivilizationLevelForBuilding(type);
+  if(getCivilizationLevel(planet) < requiredCivilizationLevel){
+    const info = civilizationInfo(requiredCivilizationLevel);
+    pushEvent(
+      '«' + def.name + '» откроется на уровне цивилизации ' +
+      requiredCivilizationLevel + ' — «' + info.name + '».',
+      'discovery'
+    );
+    return;
+  }
+
+  if(!planet.buildingQueues) planet.buildingQueues = {};
+  if(planet.buildingQueues[type]) return;
+
+  if(def.single && (planet.buildings?.[type] || 0) >= 1){
+    pushEvent('На этой планете уже построен «' + def.name + '». Его можно улучшать.', 'discovery');
+    return;
+  }
+
+  if(def.resource && !planet.resources.includes(def.resource)){
+    pushEvent('На этой планете нет месторождения ресурса «' + def.resource + '».', 'discovery');
+    return;
+  }
+
+  if(!spendCost(planet,def.cost)){
+    pushEvent('Недостаточно ресурсов для постройки: ' + def.name + '.', 'discovery');
+    return;
+  }
+
+  planet.buildingQueues[type] = {
+    type,
+    remaining:def.time,
+    total:def.time
+  };
+
+  pushEvent('Начато строительство: ' + def.name + ' на «' + planet.name + '».', 'discovery');
+
+  updateSelectedPlanetResourceBar();
+  if(currentFleetPlanet === planet) renderPlanetMenuTab(planet);
+}
+
+function getQueuedShipCount(planet, type){
+  const q = planet.shipQueue;
+  if(!q) return 0;
+  let count = q.type === type ? 1 : 0;
+  if(Array.isArray(q.pending)){
+    q.pending.forEach(t => { if(t === type) count++; });
+  }
+  return count;
+}
+
+function startShipBuild(planet, type){
+  const def = SHIP_DEFS[type];
+  if(!def || planet.owner !== 'player') return;
+
+  const requiredCivilizationLevel = requiredCivilizationLevelForShip(type);
+  if(getCivilizationLevel(planet) < requiredCivilizationLevel){
+    const info = civilizationInfo(requiredCivilizationLevel);
+    pushEvent(
+      'Корабль «' + def.name + '» откроется на уровне цивилизации ' +
+      requiredCivilizationLevel + ' — «' + info.name + '».',
+      'discovery'
+    );
+    return;
+  }
+
+  if(type === 'colonizer' && (planet.population || 0) < 500){
+    pushEvent(
+      'Для колонизационного корабля на «' + planet.name + '» нужно минимум 500 жителей. На борт отправятся 300 колонистов.',
+      'discovery'
+    );
+    return;
+  }
+
+  if(!spendCost(planet,def.cost)){
+    pushEvent('Недостаточно ресурсов для корабля «' + def.name + '».', 'discovery');
+    return;
+  }
+
+  if(!planet.shipQueue){
+    planet.shipQueue = {type,remaining:def.time,total:def.time,pending:[]};
+  }else{
+    if(!Array.isArray(planet.shipQueue.pending)) planet.shipQueue.pending = [];
+    planet.shipQueue.pending.push(type);
+  }
+
+  const queuedCount = getQueuedShipCount(planet, type);
+  pushEvent(
+    'На верфи «' + planet.name + '» в очередь добавлен корабль «' + def.name + '» × ' + queuedCount + '.',
+    'discovery'
+  );
+  updateSelectedPlanetResourceBar();
+  if(currentFleetPlanet === planet) renderPlanetMenuTab(planet);
+}
+
+function makeBuiltShip(owner, planet, type){
+  const def = SHIP_DEFS[type];
+  const el = document.createElement('div');
+  el.className = 'scout unitShip ship-world-' + type + ' ' + owner;
+  el.innerHTML = type === 'scout'
+    ? renderSatelliteIcon('size-world')
+    : '<img class="worldShipImg" src="' + shipArt(type) + '" alt="">';
+  scoutLayer.appendChild(el);
+
+  const timerEl = document.createElement('div');
+  timerEl.className = 'scanTimer';
+  scoutLayer.appendChild(timerEl);
+
+  shipSerial++;
+  const ship = {
+    id:owner + '-' + type + '-' + shipSerial,
+    type,
+    name:def.name + ' ' + shipSerial,
+    owner,
+    x:planet.x,y:planet.y,
+    targetPlanet:null,
+    targetPoint:null,
+    orbitPlanet:planet,
+    orbitAngle:Math.random()*Math.PI*2,
+    orbitDirection:Math.random()<.5 ? -1 : 1,
+    orbitAngularSpeed:.07 + Math.random()*.04,
+    speed:def.speed,
+    el,timerEl,
+    scanState:null,
+    cooldownState:null,
+    researchMining:null,
+    planetMining:null,
+    planetMiningCargo:{},
+    autoPatrolPlanet:null,
+    patrolState:null,
+    combatTarget:null,
+    attackCooldown:0,
+    stationary:false,
+    lastDepartureTarget:planet,
+    canScan:!!def.canScan,
+    canMineResearch:!!def.canMineResearch,
+    canMinePlanet:!!def.canMinePlanet,
+    homePlanet:planet,
+    miningCargo:0,
+    miningCapacity:6,
+    planetMiningCapacity:18,
+    cargoCapacity:def.cargoCapacity || 0,
+    resourceTransport:null,
+    colonistCapacity:def.colonistCapacity || 0,
+    colonists:0,
+    lastRevealX:planet.x,lastRevealY:planet.y,
+    idleTimer:0
+  };
+  const profile = COMBAT_PROFILES[type] || COMBAT_PROFILES.scout;
+  ship.maxHp = profile.hp;
+  ship.hp = profile.hp;
+  ship.damage = profile.damage;
+  ship.attackRange = profile.range;
+  ship.attackInterval = profile.interval;
+
+  if(type === 'colonizer'){
+    const capacity = ship.colonistCapacity || 300;
+    const leaveBehind = 200;
+    const available = Math.max(0,Math.floor((planet.population || 0) - leaveBehind));
+    ship.colonists = Math.min(capacity,available);
+    if(ship.colonists > 0){
+      planet.population = Math.max(0,(planet.population || 0) - ship.colonists);
+    }
+
+    if(owner === 'player'){
+      if(ship.colonists >= 100){
+        pushEvent(
+          ship.name + ': на борт переселены ' + ship.colonists + ' колонистов с «' + planet.name + '».',
+          'discovery'
+        );
+      }else{
+        pushEvent(
+          ship.name + ': недостаточно населения для полноценной колонизации.',
+          'discovery'
+        );
+      }
+    }
+  }
+
+  attachShipClick(ship);
+  scouts.push(ship);
+  placeScoutOnOrbit(ship);
+  updateScoutElement(ship);
+  return ship;
+}
+
+function updateEconomy(dtGame){
+  planets.forEach(p => {
+    if(p.owner !== 'player') return;
+
+    // Производство всех добывающих сооружений.
+    for(const [type,def] of Object.entries(BUILDING_DEFS)){
+      if(def.resource && def.production){
+        const count = p.buildings?.[type] || 0;
+        if(count > 0){
+          addStock(
+            p,
+            def.resource,
+            count *
+            def.production *
+            miningProductionMultiplier(p,type) *
+            civilizationProductionMultiplier(p) *
+            populationEfficiency(p) *
+            dtGame
+          );
+        }
+      }
+    }
+
+    updatePopulation(p,dtGame);
+
+    ensurePlanetUpgradeState(p);
+
+    for(const [type,queue] of Object.entries({...p.upgradeQueues})){
+      queue.remaining -= dtGame;
+
+      if(queue.remaining <= 0){
+        delete p.upgradeQueues[type];
+        p.upgrades[type] = (p.upgrades[type] || 0) + 1;
+
+        const isScience = type === 'scienceCenter';
+        const isMining = isMiningBuildingType(type);
+        const value = isScience
+          ? '+' + scienceCenterLevel(p)*10 + '% к скорости исследований'
+          : isMining
+            ? 'уровень ' + miningStationLevel(p,type) +
+              ' • добыча +' + (
+                BUILDING_DEFS[type].production *
+                miningProductionMultiplier(p,type) *
+                civilizationProductionMultiplier(p)
+              ).toFixed(2) +
+              ' ' + BUILDING_DEFS[type].resource + '/с'
+            : '+' + (p.upgrades[type]*25) + '% к обеспечению';
+
+        pushEvent(
+          'Улучшение «' + BUILDING_DEFS[type].name + '» завершено на «' + p.name + '»: ' + value + '.',
+          'success'
+        );
+
+        if(resourceBarPlanet === p) updateSelectedPlanetResourceBar(true);
+
+        if(currentFleetPlanet === p){
+          renderPlanetMenuTab(p);
+        }
+      }
+    }
+
+    if(!p.buildingQueues) p.buildingQueues = {};
+    for(const [type,queue] of Object.entries({...p.buildingQueues})){
+      queue.remaining -= dtGame;
+
+      if(queue.remaining <= 0){
+        delete p.buildingQueues[type];
+        p.buildings[type] = (p.buildings[type] || 0) + 1;
+        pushEvent(BUILDING_DEFS[type].name + ' построена на «' + p.name + '».', 'success');
+
+        if(resourceBarPlanet === p) updateSelectedPlanetResourceBar();
+      }
+    }
+
+    if(p.shipQueue){
+      p.shipQueue.remaining -= dtGame;
+      if(p.shipQueue.remaining <= 0){
+        const finishedType = p.shipQueue.type;
+        const pending = Array.isArray(p.shipQueue.pending) ? p.shipQueue.pending : [];
+        const nextType = pending.length ? pending.shift() : null;
+        const ship = makeBuiltShip('player',p,finishedType);
+
+        const autoPatrolEnabled = isMilitaryShipType(finishedType)
+          ? enablePatrol(ship,{
+              silent:true,
+              aroundPlanet:p,
+              radius:175,
+              autoAssigned:true
+            })
+          : false;
+
+        pushEvent(
+          'Построен корабль «' + ship.name + '» на «' + p.name + '». ' +
+          (autoPatrolEnabled
+            ? 'Военный корабль автоматически переведён в патруль вокруг планеты.'
+            : ''),
+          'success'
+        );
+
+        if(nextType){
+          const nextDef = SHIP_DEFS[nextType];
+          p.shipQueue = {
+            type:nextType,
+            remaining:nextDef.time,
+            total:nextDef.time,
+            pending
+          };
+        }else{
+          p.shipQueue = null;
+        }
+
+        if(currentFleetPlanet === p) renderPlanetMenuTab(p);
+      }
+    }
+
+    updateCivilizationProgress(p);
+  });
+}
+
+
+function getAsteroidMinerCount(asteroid, ignoreShip=null){
+  return scouts.filter(ship =>
+    ship !== ignoreShip &&
+    ship.owner === 'player' &&
+    ship.canMineResearch &&
+    (
+      (ship.targetPlanet && ship.targetPlanet.id === asteroid.id) ||
+      (ship.orbitPlanet && ship.orbitPlanet.id === asteroid.id) ||
+      (ship.researchMining && ship.researchMining.asteroid && ship.researchMining.asteroid.id === asteroid.id)
+    )
+  ).length;
+}
+
+function depositAsteroidCargo(ship, homePlanet){
+  if(!ship.researchMining) return;
+  const mining = ship.researchMining;
+  const delivered = ship.miningCargo || mining.cargo || 0;
+  if(delivered > 0){
+    playerKsenit += delivered;
+    mining.totalDelivered = (mining.totalDelivered || 0) + delivered;
+    pushEvent(
+      ship.name + ' доставил ' + delivered.toFixed(1) + ' Ксенита на «' + homePlanet.name + '».',
+      'resource'
+    );
+  }
+  ship.miningCargo = 0;
+  mining.cargo = 0;
+
+  if(mining.loopActive && mining.asteroid.reserve > 0){
+    mining.stage = 'toAsteroid';
+    setScoutTarget(ship, mining.asteroid, {silent:true,preserveMining:true});
+    pushEvent(
+      ship.name + ' выгрузил Ксенит и автоматически снова направился к «' + mining.asteroid.name + '».',
+      'discovery'
+    );
+  }else{
+    if(mining.asteroid.reserve <= 0){
+      pushEvent('Астероид исчерпан. ' + ship.name + ' завершил рейсы.', 'discovery');
+    }else{
+      pushEvent(ship.name + ' отозван с добычи и остаётся на базе.', 'discovery');
+    }
+    ship.researchMining = null;
+  }
+}
+
+function startResearchMining(ship, asteroid){
+  const homePlanet = ship.homePlanet || ship.lastDepartureTarget || playerPlanet;
+  ship.researchMining = {
+    asteroid,
+    homePlanet,
+    stage:'mining',
+    remaining:14,
+    miningTime:14,
+    cargo:0,
+    capacity:ship.miningCapacity || 6,
+    totalDelivered:(ship.researchMining?.totalDelivered || 0),
+    loopActive:true
+  };
+  pushEvent(ship.name + ' начал добычный цикл на астероиде.', 'discovery');
+}
+
+function updateResearchMining(ship, dtGame){
+  const mining = ship.researchMining;
+  if(!mining) return;
+
+  const asteroid = mining.asteroid;
+  if(asteroid.reserve <= 0){
+    ship.researchMining = null;
+    ship.miningCargo = 0;
+    pushEvent('Запасы Ксенита на астероиде исчерпаны.', 'discovery');
+    return;
+  }
+
+  if(mining.stage === 'mining'){
+    mining.remaining = Math.max(0, mining.remaining - dtGame);
+    if(mining.remaining <= 0){
+      const load = Math.min(mining.capacity, asteroid.reserve);
+      asteroid.reserve -= load;
+      mining.cargo = load;
+      ship.miningCargo = load;
+      mining.stage = 'returning';
+      pushEvent(ship.name + ' загрузил ' + load.toFixed(1) + ' Ксенита и возвращается на базу.', 'resource');
+      setScoutTarget(ship, mining.homePlanet, {silent:true,preserveMining:true});
+    }
+  }
+}
+
+
+function ensurePlanetExtractionReserves(planet){
+  if(planet.extractionReserves) return planet.extractionReserves;
+  planet.extractionReserves = {};
+  const resources = [...new Set((planet.resources || []).filter(Boolean))];
+  if(!resources.length) return planet.extractionReserves;
+
+  // Каждая непригодная для колонизации планета содержит ровно 10 000 ед.
+  // местных ресурсов. Пропорции случайны, поэтому ценность таких миров различается.
+  const TOTAL = 10000;
+  const minShare = resources.length > 1 ? Math.min(500, Math.floor(TOTAL / (resources.length * 3))) : 0;
+  const guaranteed = minShare * resources.length;
+  const distributable = TOTAL - guaranteed;
+  const weights = resources.map(() => .35 + Math.random() * 1.65);
+  const weightSum = weights.reduce((a,b)=>a+b,0) || 1;
+  let assigned = 0;
+
+  resources.forEach((resource,index) => {
+    const variable = index === resources.length - 1
+      ? distributable - assigned
+      : Math.floor(distributable * weights[index] / weightSum);
+    assigned += variable;
+    planet.extractionReserves[resource] = minShare + variable;
+  });
+
+  // Защита от округления: итог всегда должен быть ровно 10 000.
+  const actual = Object.values(planet.extractionReserves).reduce((sum,v)=>sum+v,0);
+  if(actual !== TOTAL){
+    planet.extractionReserves[resources[0]] += TOTAL - actual;
+  }
+  planet.extractionReserveTotal = TOTAL;
+  return planet.extractionReserves;
+}
+
+function planetExtractionRemaining(planet){
+  const reserves = ensurePlanetExtractionReserves(planet);
+  return Object.values(reserves).reduce((sum,v)=>sum + Math.max(0,v || 0),0);
+}
+
+function getPlanetMinerCount(planet, ignoreShip=null){
+  return scouts.filter(ship =>
+    ship !== ignoreShip &&
+    ship.owner === 'player' &&
+    ship.canMinePlanet &&
+    (
+      (ship.targetPlanet && ship.targetPlanet.id === planet.id) ||
+      (ship.planetMining && ship.planetMining.planet && ship.planetMining.planet.id === planet.id)
+    )
+  ).length;
+}
+
+function startPlanetResourceMining(ship, planet){
+  if(!ship || !ship.canMinePlanet || !planet || planet.habitable || planet.owner !== 'neutral') return false;
+  if(planetExtractionRemaining(planet) <= 0){
+    ship.planetMining = null;
+    ship.planetMiningCargo = {};
+    pushEvent('Месторождения на «' + planet.name + '» полностью исчерпаны. ' + ship.name + ' остаётся на орбите и ждёт приказа.', 'discovery');
+    return false;
+  }
+  const homePlanet = ship.homePlanet || ship.lastDepartureTarget || playerPlanet;
+  ship.planetMining = {
+    planet,
+    homePlanet,
+    stage:'mining',
+    remaining:18,
+    miningTime:18,
+    capacity:ship.cargoCapacity || ship.planetMiningCapacity || 18,
+    totalDelivered:0,
+    loopActive:true
+  };
+  ship.planetMiningCargo = {};
+  pushEvent(ship.name + ' начал загрузку ресурсов на «' + planet.name + '».', 'resource');
+  return true;
+}
+
+function loadPlanetMiningCargo(ship){
+  const mining = ship.planetMining;
+  if(!mining) return 0;
+  const reserves = ensurePlanetExtractionReserves(mining.planet);
+  const active = Object.keys(reserves).filter(r => reserves[r] > 0);
+  if(!active.length) return 0;
+
+  let remaining = Math.max(1, Math.floor(mining.capacity || 18));
+  const cargo = {};
+  while(remaining > 0){
+    const available = active.filter(r => reserves[r] > 0);
+    if(!available.length) break;
+    let changed = false;
+    for(const resource of available){
+      if(remaining <= 0) break;
+      const take = Math.min(reserves[resource], Math.max(1, Math.floor(remaining / available.length)));
+      if(take <= 0) continue;
+      reserves[resource] -= take;
+      cargo[resource] = (cargo[resource] || 0) + take;
+      remaining -= take;
+      changed = true;
+    }
+    if(!changed) break;
+  }
+  ship.planetMiningCargo = cargo;
+  return Object.values(cargo).reduce((sum,v)=>sum+v,0);
+}
+
+function depositPlanetMiningCargo(ship, homePlanet){
+  const mining = ship.planetMining;
+  if(!mining) return;
+  const cargo = ship.planetMiningCargo || {};
+  let delivered = 0;
+  const parts = [];
+  for(const [resource,amount] of Object.entries(cargo)){
+    if(amount <= 0) continue;
+    addStock(homePlanet,resource,amount);
+    delivered += amount;
+    parts.push(resource + ' +' + amount);
+  }
+  mining.totalDelivered = (mining.totalDelivered || 0) + delivered;
+  ship.planetMiningCargo = {};
+
+  if(delivered > 0){
+    pushEvent(ship.name + ' доставил на «' + homePlanet.name + '»: ' + parts.join(' • ') + '.', 'resource');
+    if(resourceBarPlanet === homePlanet) updateSelectedPlanetResourceBar(true);
+  }
+
+  if(mining.loopActive && planetExtractionRemaining(mining.planet) > 0){
+    mining.stage = 'toPlanet';
+    setScoutTarget(ship,mining.planet,{silent:true,preservePlanetMining:true});
+    pushEvent(ship.name + ' выгрузил ресурсы и снова направился к «' + mining.planet.name + '».', 'discovery');
+  }else{
+    if(planetExtractionRemaining(mining.planet) <= 0){
+      pushEvent('Месторождения на «' + mining.planet.name + '» исчерпаны. ' + ship.name + ' завершил рейсы.', 'discovery');
+    }else{
+      pushEvent(ship.name + ' отозван с автономной добычи и остаётся на базе.', 'discovery');
+    }
+    ship.planetMining = null;
+  }
+}
+
+function updatePlanetResourceMining(ship,dtGame){
+  const mining = ship.planetMining;
+  if(!mining || mining.stage !== 'mining') return;
+  mining.remaining = Math.max(0,mining.remaining-dtGame);
+  if(mining.remaining > 0) return;
+
+  const load = loadPlanetMiningCargo(ship);
+  if(load <= 0){
+    const exhaustedPlanet = mining.planet;
+    ship.planetMining = null;
+    ship.planetMiningCargo = {};
+    ship.stationary = false;
+    // Корабль уже находится на орбите этой планеты: остаётся здесь и ждёт приказа.
+    pushEvent('На «' + exhaustedPlanet.name + '» больше нет ресурсов. ' + ship.name + ' остаётся на орбите и ждёт дальнейших указаний.', 'discovery');
+    if(ship.owner === 'player'){
+      scoutCommandHint.textContent = ship.name + ': месторождение исчерпано. Корабль остаётся на орбите «' + exhaustedPlanet.name + '».';
+      scoutCommandHint.classList.add('show');
+      clearTimeout(updatePlanetResourceMining._hintTimer);
+      updatePlanetResourceMining._hintTimer = setTimeout(()=>scoutCommandHint.classList.remove('show'),3200);
+    }
+    return;
+  }
+
+  mining.stage = 'returning';
+  pushEvent(ship.name + ' загрузил ' + load + ' ед. ресурсов на «' + mining.planet.name + '» и возвращается на базу.', 'resource');
+  setScoutTarget(ship,mining.homePlanet,{silent:true,preservePlanetMining:true});
+}
+
+function startPlanetCapture(planet, attackerOwner='enemy'){
+  if(planet.captureState || planet.owner === attackerOwner) return;
+  planet.captureState = {
+    attackerOwner,
+    remaining:180,
+    total:180,
+    startPopulation:planet.population,
+    lastNotice:180
+  };
+  pushEvent('ТРЕВОГА: начался захват «' + planet.name + '». До потери планеты: 180 сек.', 'attack');
+}
+
+function updateCaptures(dtGame){
+  planets.forEach(p => {
+    const c = p.captureState;
+    if(!c) return;
+
+    c.remaining = Math.max(0,c.remaining-dtGame);
+    const progress = 1 - c.remaining/c.total;
+    p.population = Math.max(0, Math.floor(c.startPopulation * (1 - .30*progress)));
+
+    if(c.remaining <= 0){
+      p.owner = c.attackerOwner;
+      p.buildings = {
+        ironMine:0,copperMine:0,lithiumMine:0,
+        foodFarm:0,waterPlant:0,habitat:0,clinic:0,entertainment:0,securityCenter:0,
+        scienceCenter:0,
+        missileBattery:0,laserBattery:0,shipyard:0
+      };
+      p.upgrades = {
+        foodFarm:0,waterPlant:0,habitat:0,clinic:0,entertainment:0,securityCenter:0,
+        scienceCenter:0
+      };
+      p.upgradeQueues = {};
+      p.buildingQueues = {};
+      p.buildingQueue = null;
+      p.shipQueue = null;
+      p.captureState = null;
+      updatePlanetMapData(p);
+      pushEvent('«' + p.name + '» захвачена. Все постройки уничтожены.', 'discovery');
+    }
+  });
+}
+
+function buildProgressHtml(queue, label){
+  if(!queue) return '';
+  const pct = Math.max(0,Math.min(100,(1-queue.remaining/queue.total)*100));
+  return `<div class="queueText">${label}: ${Math.ceil(queue.remaining)} сек.</div><div class="queueBar"><div class="queueFill" style="width:${pct}%"></div></div>`;
+}
+
+
+
+function getBuildingIconMeta(type){
+  const meta = {
+    ironMine:{glyph:'Fe', orb:'iron', mode:'mine'},
+    copperMine:{glyph:'Cu', orb:'copper', mode:'mine'},
+    lithiumMine:{glyph:'Li', orb:'lithium', mode:'mine'},
+    foodFarm:{glyph:'🌿', orb:'food', mode:'emoji'},
+    waterPlant:{glyph:'💧', orb:'water', mode:'emoji'},
+    habitat:{glyph:'🏠', orb:'housing', mode:'emoji'},
+    clinic:{glyph:'✚', orb:'medicine', mode:'emoji'},
+    entertainment:{glyph:'✦', orb:'entertainment', mode:'emoji'},
+    securityCenter:{glyph:'🛡', orb:'security', mode:'emoji'},
+    scienceCenter:{glyph:'⚛', orb:'science', mode:'emoji'},
+    missileBattery:{glyph:'🚀', orb:'missile', mode:'emoji'},
+    laserBattery:{glyph:'✹', orb:'laser', mode:'emoji'}
+  };
+  if(meta[type]) return meta[type];
+  const def = BUILDING_DEFS[type];
+  if(def?.resource){
+    const res = resourceVisualMeta(def.resource);
+    return {glyph:res.short || def.resource.slice(0,2), orb:res.cls || 'iron', mode:'mine'};
+  }
+  return {glyph:'⚙', orb:'iron', mode:'emoji'};
+}
+
+function buildingIconHtml(type){
+  const meta = getBuildingIconMeta(type);
+  const def = BUILDING_DEFS[type];
+
+  const body = meta.mode === 'mine' && def?.resource
+    ? `<span class="buildRes">
+        <span class="stationResourceBadge">${resourceIconHtml(def.resource,'sm')}</span>
+        <span class="factoryMini">
+          <span class="factoryMiniBody"></span>
+          <span class="factoryMiniChimney"></span>
+        </span>
+      </span>`
+    : `<span class="buildEmoji">${meta.glyph}</span>
+       <span class="buildingMiniPlate"></span>`;
+
+  return `
+    <div class="buildIcon ${type}">
+      <span class="buildOrb ${meta.orb}"></span>
+      ${body}
+    </div>
+  `;
+}
+
+function costChipClassName(resource){
+  return 'costChip resource-' + String(resource).replace(/[^a-zA-Zа-яА-ЯёЁ0-9_-]/g,'');
+}
+
+function buildingCardHtml(planet,type){
+  const def = BUILDING_DEFS[type];
+  const requiredCivilizationLevel = requiredCivilizationLevelForBuilding(type);
+
+  if(getCivilizationLevel(planet) < requiredCivilizationLevel){
+    return `<div class="buildCard ${type} civilizationLockedCard">
+      <div class="buildHead">
+        ${buildingIconHtml(type)}
+        <div class="buildText">
+          <div class="buildName">${def.name}</div>
+          <div class="buildDesc">${def.desc}</div>
+        </div>
+      </div>
+      ${lockedCivilizationHtml(requiredCivilizationLevel)}
+    </div>`;
+  }
+
+  if(!planet.buildingQueues) planet.buildingQueues = {};
+  const queue = planet.buildingQueues[type];
+  const inQueue = !!queue;
+  const affordable = canAfford(planet,def.cost);
+  const unavailableDeposit = !!def.resource && !planet.resources.includes(def.resource);
+  const count = planet.buildings[type] || 0;
+  const singleBuilt = !!def.single && count >= 1;
+  const disabled = inQueue || !affordable || unavailableDeposit || singleBuilt;
+
+  let productionInfo = '';
+  let buildingLabel = def.name + (count ? ' • ' + count : '');
+
+  if(def.resource && def.production){
+    const level = miningStationLevel(planet,type);
+    const rate = count > 0
+      ? def.production *
+        miningProductionMultiplier(planet,type) *
+        civilizationProductionMultiplier(planet)
+      : def.production;
+
+    productionInfo = `<div class="buildTime">
+      ${count > 0 ? 'Текущая добыча' : 'Базовая добыча'}:
+      +${rate.toFixed(2)} ${def.resource}/с
+    </div>`;
+
+    buildingLabel = def.name + (count ? ' • Ур. ' + level : '');
+  }
+
+  // Добывающая станция после постройки отображается одной карточкой:
+  // текущий уровень, добыча, цена следующего уровня и кнопка улучшения — всё вместе.
+  if(singleBuilt && !inQueue && isMiningBuildingType(type)){
+    ensurePlanetUpgradeState(planet);
+
+    const currentUpgradeCount = Math.max(0,planet.upgrades[type] || 0);
+    const currentLevel = 1 + currentUpgradeCount;
+    const atMax = currentLevel >= MAX_MINING_LEVEL;
+    const nextLevel = Math.min(MAX_MINING_LEVEL,currentLevel + 1);
+    const upgradeQueue = planet.upgradeQueues[type];
+
+    const civMult = civilizationProductionMultiplier(planet);
+    const currentRate = def.production * miningProductionMultiplier(planet,type) * civMult;
+    const nextMultiplier = 1 + (nextLevel - 1) * MINING_PRODUCTION_PER_LEVEL;
+    const nextRate = def.production * nextMultiplier * civMult;
+    const upgradeCost = atMax ? {} : miningUpgradeCost(type,currentUpgradeCount);
+
+    return `<div class="buildCard ${type} builtSingleStation combinedMineCard">
+      <div class="buildHead">
+        ${buildingIconHtml(type)}
+        <div class="buildText">
+          <div class="buildName">${def.name}</div>
+          <div class="buildDesc">${def.desc}</div>
+        </div>
+        <div class="mineLevelPill">УР. ${currentLevel}</div>
+      </div>
+
+      <div class="combinedMineCurrent">
+        <div>
+          <span class="combinedMineLabel">Текущая добыча</span>
+          <b>+${currentRate.toFixed(2)} ${def.resource}/с</b>
+        </div>
+        <div class="combinedMineResource">${resourceIconHtml(def.resource,'sm')}</div>
+      </div>
+
+      ${atMax
+        ? `<div class="combinedMineMax">Максимальный уровень станции достигнут</div>`
+        : `
+          <div class="combinedMineUpgrade">
+            <div class="combinedMineNext">
+              <span>Следующий уровень</span>
+              <b>УР. ${nextLevel}</b>
+              <small>Добыча станет +${nextRate.toFixed(2)} ${def.resource}/с</small>
+            </div>
+
+            <div class="combinedMineCostTitle">
+              Стоимость улучшения
+              <span>• каждый уровень +${Math.round(MINING_UPGRADE_COST_STEP * 100)}% от базовой цены</span>
+            </div>
+
+            <div class="costLine">
+              ${Object.entries(upgradeCost).map(([r,a])=>resourceCostChipHtml(r,a)).join('')}
+            </div>
+
+            ${upgradeQueue ? buildProgressHtml(upgradeQueue,'Модернизация станции') : ''}
+
+            <div class="combinedMineActions">
+              ${upgradeQueue
+                ? `<button class="cancelBuildBtn cancelMineUpgradeBtn" data-mine-upgrade="${type}">Отменить улучшение</button>`
+                : `<button class="buildBtn startMineUpgradeBtn" data-mine-upgrade="${type}" ${canAfford(planet,upgradeCost)?'':'disabled'}>
+                    Улучшить до Ур. ${nextLevel}
+                  </button>`
+              }
+            </div>
+          </div>
+        `
+      }
+    </div>`;
+  }
+
+  return `<div class="buildCard ${type}">
+    <div class="buildHead">
+      ${buildingIconHtml(type)}
+      <div class="buildText">
+        <div class="buildName">${buildingLabel}</div>
+        <div class="buildDesc">${def.desc}</div>
+      </div>
+    </div>
+
+    <div class="costLine">
+      ${Object.entries(def.cost).map(([r,a])=>resourceCostChipHtml(r,a)).join('')}
+    </div>
+
+    <div class="buildBottom">
+      <div>
+        <div class="buildTime">Строительство: ${def.time} сек.</div>
+        ${productionInfo}
+      </div>
+      ${inQueue
+        ? `<button class="cancelBuildBtn cancelBuildingBtn" data-building="${type}">Отменить</button>`
+        : `<button class="buildBtn buildBuildingBtn" data-building="${type}" ${disabled?'disabled':''}>Построить</button>`
+      }
+    </div>
+
+    ${inQueue ? buildProgressHtml(queue,'Осталось') : ''}
+  </div>`;
+}
+
+function shipBuildCardHtml(planet,type){
+  const def = SHIP_DEFS[type];
+  const requiredCivilizationLevel = requiredCivilizationLevelForShip(type);
+  const cls = shipTypeCategoryClass(type);
+
+  if(getCivilizationLevel(planet) < requiredCivilizationLevel){
+    return `<div class="shipBuildCard ${cls} civilizationLockedCard">
+      <div class="shipBlueprint ${type}">
+        ${type === 'scout'
+          ? `<div class="shipBlueprintImg" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">${renderSatelliteIcon('size-card')}</div>`
+          : `<img class="shipBlueprintImg" src="${shipArt(type)}" alt="${def.name}">`
+        }
+      </div>
+      <div class="shipBuildInfo">
+        <div class="shipBuildHeader">
+          <div class="shipBuildNameRow"><div class="shipBuildName">${def.name}</div></div>
+          ${categoryLabel(def.category)}
+        </div>
+        <div class="shipBuildRole">${def.role}</div>
+        ${lockedCivilizationHtml(requiredCivilizationLevel)}
+      </div>
+      <div class="shipBuildAction">
+        <div class="civShipLock">🔒</div>
+      </div>
+    </div>`;
+  }
+
+  const queue = planet.shipQueue;
+  const queuedCount = getQueuedShipCount(planet, type);
+  const affordable = canAfford(planet,def.cost);
+  const disabled = !affordable;
+  const totalCostHtml = Object.entries(def.cost).map(([r,a])=>resourceCostChipHtml(r,a)).join('');
+  return `<div class="shipBuildCard ${cls}">
+    <div class="shipBlueprint ${type}">
+      ${type === 'scout'
+        ? `<div class="shipBlueprintImg" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">${renderSatelliteIcon('size-card')}</div>`
+        : `<img class="shipBlueprintImg" src="${shipArt(type)}" alt="${def.name}">`
+      }
+    </div>
+    <div class="shipBuildInfo">
+      <div class="shipBuildHeader">
+        <div class="shipBuildNameRow">
+          <div class="shipBuildName">${def.name}</div>
+        </div>
+        ${categoryLabel(def.category)}
+      </div>
+      <div class="shipBuildRole">${def.role}</div>
+      <div class="costLine">${totalCostHtml}</div>
+      <div class="shipBuildMeta">Время: ${def.time} сек. • Скорость: ${def.speed}</div>
+      <div class="shipBuildQty">${queuedCount ? 'В очереди: ' + queuedCount : 'Нажимайте «Построить» несколько раз для очереди.'}</div>
+      ${queue && queue.type === type ? buildProgressHtml(queue,'Верфь') : ''}
+    </div>
+    <div class="shipBuildAction">
+      <div class="shipQueueCount">${queuedCount ? '× ' + queuedCount : '× 0'}</div>
+      <div class="shipBuildButtons">
+        <button class="buildBtn buildShipBtn" data-ship="${type}" ${disabled?'disabled':''}>${affordable?'Построить +1':'Не хватает'}</button>
+        <button class="cancelShipBtn" data-ship="${type}" ${queuedCount ? '' : 'disabled'}>Отменить −1</button>
+      </div>
+    </div>
+  </div>`;
+}
+function shipCard(name, role, tag, tagClass=''){
+  return `
+    <div class="shipCard">
+      <div>
+        <div class="shipName">${name}</div>
+        <div class="shipRole">${role}</div>
+      </div>
+      <div class="shipTag ${tagClass}">${tag}</div>
+    </div>
+  `;
+}
+
+function satisfactionInfo(value){
+  if(value >= 75) return {emoji:'😊', cls:'satisfaction-good', label:'Высокая'};
+  if(value >= 45) return {emoji:'😐', cls:'satisfaction-mid', label:'Средняя'};
+  return {emoji:'☹️', cls:'satisfaction-bad', label:'Низкая'};
+}
+
+function techCard(name, desc, level, lithiumCost, extra=''){
+  const key = techKey(name);
+  const active = researchQueue && researchQueue.key === key;
+  const completed = completedTechs.has(key);
+  const canStart = !researchQueue && !completed && playerKsenit >= lithiumCost;
+  return `
+    <div class="techCard ${active?'activeResearch':''} ${completed?'completedResearch':''}">
+      <div class="techHead">
+        <div class="techName">${name}</div>
+        <div class="techLevel">Ур. ${level}</div>
+      </div>
+      <div class="techDesc">${desc}</div>
+      <div class="techCost">
+        Исследование: <span class="techLithium">${lithiumCost} Ксенита</span>${extra ? ' • ' + extra : ''}
+      </div>
+      ${active ? buildProgressHtml(researchQueue,'Исследование') : ''}
+      <div class="techActions">
+        ${completed
+          ? `<button class="techActionBtn" disabled>Изучено</button>`
+          : active
+            ? `<button class="techCancelBtn cancelTechBtn">Отменить</button>`
+            : `<button class="techActionBtn startTechBtn" data-name="${name}" data-level="${level}" data-cost="${lithiumCost}" ${canStart?'':'disabled'}>Исследовать</button>`
+        }
+      </div>
+    </div>
+  `;
+}
+
+function renderFleetTab(planet){
+  const autoPatrolNotice = `
+    <div class="planetNotice autoPatrolNotice">
+      <b>Автопатруль:</b> новые военные корабли после постройки автоматически охраняют район своей планеты и остаются закреплены за её списком флота, даже когда физически кружат в патрульной зоне.
+      Разведчики, грузовые, колонизационные, добывающие и ремонтные корабли остаются на орбите. Ремонтное судно автоматически чинит повреждённые корабли, вернувшиеся к этой планете.
+    </div>
+  `;
+  const localShips = fleetAtPlanet(planet).filter(s => s.owner === 'player');
+
+  const localHtml = localShips.length
+    ? localShips.map(ship => {
+        let status = ship._aeRepairTargetId
+          ? ('🔧 Ремонтирует «' + (scouts.find(x=>x.id===ship._aeRepairTargetId)?.name || 'корабль') + '»')
+          : ship._aeRepairingBy
+            ? ('🔧 Ремонт корпуса • ' + Math.ceil(ship.hp) + '/' + Math.ceil(ship.maxHp))
+            : ship.researchMining
+          ? (
+              ship.researchMining.stage === 'mining'
+                ? 'Добывает Ксенит • ' + Math.ceil(ship.researchMining.remaining) + ' сек.'
+                : ship.researchMining.stage === 'returning'
+                  ? (ship.researchMining.loopActive ? 'Возвращается с Ксенитом' : 'Отозван • возвращается на базу')
+                  : 'Автоматический рейс на астероид'
+            )
+          : ship.scanState
+            ? 'Сканирует • ' + Math.ceil(ship.scanState.remaining) + ' сек.' + (activePlanetScanners(ship.scanState.planet, ship.owner).length > 1 ? ' • ×' + activePlanetScanners(ship.scanState.planet, ship.owner).length : '')
+            : ship.cooldownState
+              ? 'Заряжает батареи • ' + Math.ceil(ship.cooldownState.remaining) + ' сек.'
+              : ship.autoPatrolPlanet === planet && ship.patrolState
+                ? (ship.combatTarget ? 'Автопатруль • перехватывает противника' : 'Автопатруль • охраняет район планеты')
+                : 'На орбите • готов';
+        return `<div class="fleetShip">
+          <div class="fleetShipIcon ${ship.type === 'scout' ? 'satelliteSlot' : ''}" ${ship.type === 'scout' ? '' : `style="background-image:url(${shipArt(ship.type)})"`}>
+            ${ship.type === 'scout' ? renderSatelliteIcon('size-list') : ''}
+          </div>
+          <div class="fleetShipText">
+            <div class="fleetShipName">${renderTinyShipIcon(ship.type,'xs')}<span>${ship.name}</span></div>
+            <div class="fleetShipStatus">${status}</div>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div class="fleetEmpty">На орбите нет ваших кораблей.</div>';
+
+  const categories = [
+    ['Лёгкие',['scout','interceptor','corvette','frigate']],
+    ['Тяжёлые',['destroyer','cruiser','battleship']],
+    ['Защитные',['guardian']],
+    ['Транспортные',['cargo']],
+    ['Сервисные',['repair']],
+    ['Стратегические',['researchMiner','colonizer']],
+    ['Сверхтяжёлые',['dreadnought','titan']]
+  ];
+
+  planetMenuContent.innerHTML = `${autoPatrolNotice}
+    <div class="planetMenuGroup theme-fleet-orbit">
+      <div class="planetMenuGroupTitle">Флот на орбите</div>
+      ${localHtml}
+    </div>
+
+    ${categories.map(([title,types]) => `
+      <div class="planetMenuGroup ${shipCategoryClass(title)}">
+        <div class="planetMenuGroupTitle shipGroupTitle ${shipCategoryClass(title)}">${title}</div>
+        ${types.map(type => shipBuildCardHtml(planet,type)).join('')}
+      </div>
+    `).join('')}
+  `;
+
+  planetMenuContent.querySelectorAll('.buildShipBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      startShipBuild(planet,btn.dataset.ship);
+    });
+  });
+  planetMenuContent.querySelectorAll('.cancelShipBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      removeOneShipOrder(planet,btn.dataset.ship);
+    });
+  });
+}
+
+function planetHeaderSummaryHtml(planet, known=true){
+  if(!known){
+    return `
+      <div class="planetHeaderSummary">
+        <div class="planetSummaryChip"><span class="chipIcon">🛰</span><span class="chipBody"><span class="chipLabel">Статус</span><span class="chipValue">Идёт разведка</span></span></div>
+        <div class="planetSummaryChip"><span class="chipIcon">❓</span><span class="chipBody"><span class="chipLabel">Данные</span><span class="chipValue">Откроются после сканирования</span></span></div>
+      </div>`;
+  }
+
+  const chips = [];
+  if(planet.owner === 'player'){
+    const civ = civilizationInfo(planet);
+    chips.push({icon:'🏛',label:'Цивилизация',value:`Ур. ${getCivilizationLevel(planet)} • ${civ.name}`});
+    chips.push({icon:'👥',label:'Население',value:Math.floor(planet.population).toLocaleString('ru-RU')});
+    chips.push({icon:'⛏',label:'Ресурсы',value:(planet.resources || []).join(' • ') || 'Нет данных'});
+    chips.push({icon:'✅',label:'Статус',value:'Ваша колония'});
+  }else if(planet.owner === 'neutral' && planet.playerScanned){
+    chips.push({icon:'🪐',label:'Статус',value:'Нейтральная планета'});
+    chips.push({icon:'📡',label:'Разведка',value:'Базовые данные открыты'});
+    chips.push({icon:'🌍',label:'Пригодность',value:planet.habitable ? 'Можно колонизировать' : 'Только добыча'});
+  }else{
+    chips.push({icon:'❓',label:'Данные',value:'Планета не исследована'});
+  }
+  if(planet.isRare) chips.push({icon:'✨',label:'Особенность',value:'Редкая планета'});
+  return `<div class="planetHeaderSummary">${chips.map(ch => `<div class="planetSummaryChip"><span class="chipIcon">${ch.icon}</span><span class="chipBody"><span class="chipLabel">${ch.label}</span><span class="chipValue">${ch.value}</span></span></div>`).join('')}</div>`;
+}
+
+function tabHelperHtml(tab, planet){
+  const config = {
+    mining:{
+      icon:'⛏', title:'Ресурсы и производство',
+      text:'Здесь вы смотрите склад планеты, месторождения и строите добывающие станции.',
+      bullets:[
+        'Сначала посмотрите, какие ресурсы уже лежат на складе.',
+        'Ниже видно, какие месторождения есть именно на этой планете.',
+        'У каждой станции одна карточка: в ней и постройка, и дальнейшее улучшение.'
+      ]
+    },
+    fleet:{
+      icon:'🚀', title:'Флот и корабли',
+      text:'Здесь собраны корабли на орбите и доступное строительство флота.',
+      bullets:[
+        'Военные корабли после постройки автоматически переходят в патруль.',
+        'Группы кораблей помогают отдавать один приказ сразу нескольким юнитам.',
+        'Транспортные и колонизационные корабли имеют отдельные кнопки действий.'
+      ]
+    },
+    population:{
+      icon:'👥', title:'Население и снабжение',
+      text:'Здесь видно настроение жителей и всё, что влияет на рост колонии.',
+      bullets:[
+        'Следите за едой, водой, жильём, медициной и безопасностью.',
+        'Хорошее снабжение ускоряет рост населения и повышает эффективность.',
+        'Инфраструктуру населения можно строить и улучшать прямо в этой вкладке.'
+      ]
+    },
+    research:{
+      icon:'🔬', title:'Исследования',
+      text:'Здесь развивается наука и открываются новые возможности планеты и флота.',
+      bullets:[
+        'Научные центры ускоряют исследования всей вашей империи.',
+        'Новые технологии открывают корабли, оборону и развитие колоний.',
+        'Если чего-то не хватает, сначала поднимите науку и цивилизацию.'
+      ]
+    },
+    defense:{
+      icon:'🛡', title:'Оборона планеты',
+      text:'Во вкладке собраны защитные сооружения и информация о захвате планеты.',
+      bullets:[
+        'Ракетные и лазерные батареи защищают планету от нападений.',
+        'Если оборона уничтожена, враг может начать захват.',
+        'Развивайте оборону на важных и богатых колониях.'
+      ]
+    },
+    civilization:{
+      icon:'🏛', title:'Уровень цивилизации',
+      text:'Эта вкладка показывает стадию развития колонии и будущие открытия.',
+      bullets:[
+        'Каждый новый уровень цивилизации открывает новые возможности.',
+        'Рост населения, науки и инфраструктуры помогает двигаться дальше.',
+        'Смотрите, что уже открыто и что станет доступно следующим этапом.'
+      ]
+    }
+  };
+  const c = config[tab] || config.mining;
+  return `
+    <div class="planetTabHelper">
+      <div class="planetTabHelperTop">
+        <div class="planetTabHelperIcon">${c.icon}</div>
+        <div>
+          <div class="planetTabHelperTitle">${c.title}</div>
+          <div class="planetTabHelperText">${c.text}</div>
+        </div>
+      </div>
+      <div class="planetTabHelperBullets">
+        ${c.bullets.map((item,idx)=>`<div class="planetTabHelperBullet"><div class="planetTabHelperBulletNum">${idx+1}</div><div class="planetTabHelperBulletText">${item}</div></div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function injectPlanetTabHelper(planet){
+  if(!planetMenuContent) return;
+  const helperMarkup = tabHelperHtml(currentPlanetTab, planet);
+
+  // ВАЖНО: не переписываем innerHTML всего меню после навешивания обработчиков.
+  // Иначе браузер создаёт кнопки заново и их click-listeners теряются.
+  planetMenuContent.insertAdjacentHTML('afterbegin', helperMarkup);
+}
+
+function renderMiningTab(planet){
+  const known = planet.playerScanned || planet.owner === 'player';
+  const deposits = known ? planet.resources : planet.playerDiscoveredResources;
+
+  const availableMineTypes = mineTypesForPlanet(planet);
+
+  planetMenuContent.innerHTML = `
+    <div class="planetMenuGroup theme-stockpile">
+      <div class="planetMenuGroupTitle">Склад планеты</div>
+      <div class="sectionSubtext">Верхний блок показывает, сколько ресурсов сейчас лежит на этой планете.</div>
+      ${stockpileHtml(planet)}
+      <div class="planetNotice">
+        Ресурсы вверху экрана показывают текущий склад этой планеты и остаются видимыми,
+        пока вы выбираете здания, корабли и улучшения.
+      </div>
+      ${planet.colonyStarterMineKit ? `
+        <div class="planetNotice colonyMineKitNotice">
+          <b>Колониальный строительный комплект:</b> стартового склада хватает на строительство
+          по одной добывающей станции каждого месторождения этой планеты.
+          Каждая станция строится только в одном экземпляре, но её можно улучшать до уровня ${MAX_MINING_LEVEL}.
+          Стоимость каждого следующего уровня выше предыдущего.
+        </div>
+      ` : ''}
+    </div>
+
+    <div class="planetMenuGroup theme-deposits">
+      <div class="planetMenuGroupTitle">Какие ресурсы есть на планете</div>
+      <div class="sectionSubtext">Из этих месторождений можно строить добывающие станции и улучшать их.</div>
+      <div class="planetMenuResources">
+        ${(deposits || []).map(r => `
+          <span class="resourceChip resourceDepositChip">
+            ${resourceIconHtml(r,'sm')}<span>${r}</span>
+          </span>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="planetMenuGroup theme-mines">
+      <div class="planetMenuGroupTitle">Шахты и добывающие станции</div>
+      <div class="sectionSubtext">У каждой станции одна понятная карточка: уровень, добыча, цена следующего улучшения.</div>
+      ${
+        availableMineTypes.length
+          ? availableMineTypes.map(([,type]) =>
+              buildingCardHtml(planet,type)
+            ).join('')
+          : '<div class="planetNotice">Для доступных ресурсов пока нет подходящих добывающих сооружений.</div>'
+      }
+    </div>
+
+    <div class="planetMenuGroup theme-infra">
+      <div class="planetMenuGroupTitle">Дополнительная инфраструктура</div>
+      <div class="sectionSubtext">Эти улучшения появятся позже, когда вы продвинетесь дальше в развитии.</div>
+      ${menuFacility('⚙', 'Переработка сырья', 'Подготовка добытых материалов для строительства и производства.', 'Позже')}
+      ${menuFacility('▤', 'Хранилища', 'Увеличивают максимальный запас ресурсов.', 'Позже')}
+      ${menuFacility('⇄', 'Логистика', 'Ускоряет переброску ресурсов между колониями.', 'Позже')}
+    </div>
+  `;
+
+  planetMenuContent.querySelectorAll('.buildBuildingBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      startBuilding(planet,btn.dataset.building);
+    });
+  });
+  planetMenuContent.querySelectorAll('.cancelBuildingBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelBuilding(planet,btn.dataset.building);
+    });
+  });
+
+  planetMenuContent.querySelectorAll('.startMineUpgradeBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      startMiningUpgrade(planet,btn.dataset.mineUpgrade);
+    });
+  });
+
+  planetMenuContent.querySelectorAll('.cancelMineUpgradeBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelMiningUpgrade(planet,btn.dataset.mineUpgrade);
+    });
+  });
+}
+
+function renderPopulationTab(planet){
+  const population = planet.owner === 'player'
+    ? Math.floor(planet.population).toLocaleString('ru-RU')
+    : (planet.playerScanned ? '0' : 'Неизвестно');
+
+  const habitability = planet.owner === 'player'
+    ? 'Заселена'
+    : (!planet.playerScanned
+        ? 'Не исследовано'
+        : (planet.habitable ? 'Пригодна для колонии' : 'Непригодна для постоянного населения'));
+
+  const satisfaction = planet.owner === 'player' ? calculateSatisfaction(planet) : 0;
+  const sat = satisfactionInfo(satisfaction);
+  const growth = populationGrowthPerMinute(planet);
+  const growthPct = growth * 100;
+  const efficiency = Math.round(populationEfficiency(planet)*100);
+
+  planetMenuContent.innerHTML = `
+    <div class="planetMenuGroup theme-pop-status">
+      <div class="planetMenuGroupTitle">Состояние населения</div>
+
+      <div class="populationSummary">
+        <div class="populationMetric">
+          <div class="populationMetricLabel">Население</div>
+          <div class="populationMetricValue">${population}</div>
+        </div>
+        <div class="populationMetric">
+          <div class="populationMetricLabel">Пригодность</div>
+          <div class="populationMetricValue">${habitability}</div>
+        </div>
+        <div class="populationMetric">
+          <div class="populationMetricLabel">Удовлетворённость</div>
+          <div class="populationMetricValue">
+            ${sat.emoji} <span class="satisfactionValue ${sat.cls}">${satisfaction}%</span>
+          </div>
+        </div>
+        <div class="populationMetric">
+          <div class="populationMetricLabel">Изменение / мин.</div>
+          <div class="populationMetricValue ${growth >= 0 ? 'positive' : 'negative'}">
+            ${growth >= 0 ? '+' : ''}${growthPct.toFixed(2)}%
+          </div>
+        </div>
+      </div>
+
+      <div class="populationEffect">
+        <b>${sat.label}</b> • ${populationTrendText(planet)}<br>
+        Эффективность добычи и промышленности: <b>${efficiency}%</b>.
+        Хорошее снабжение ускоряет рост населения; сильный дефицит вызывает отток.
+      </div>
+    </div>
+
+    <div class="planetMenuGroup theme-pop-needs">
+      <div class="planetMenuGroupTitle">Потребности колонии</div>
+      <div class="populationNeedsList">
+        ${populationNeedBar(planet,'food')}
+        ${populationNeedBar(planet,'water')}
+        ${populationNeedBar(planet,'housing')}
+        ${populationNeedBar(planet,'medicine')}
+        ${populationNeedBar(planet,'entertainment')}
+        ${populationNeedBar(planet,'security')}
+      </div>
+    </div>
+
+    <div class="planetMenuGroup theme-pop-infra">
+      <div class="planetMenuGroupTitle">Инфраструктура населения</div>
+      <div class="populationBuildGroup">
+        ${buildingCardHtml(planet,'foodFarm')}
+        ${infrastructureUpgradeCardHtml(planet,'foodFarm')}
+
+        ${buildingCardHtml(planet,'waterPlant')}
+        ${infrastructureUpgradeCardHtml(planet,'waterPlant')}
+
+        ${buildingCardHtml(planet,'habitat')}
+        ${infrastructureUpgradeCardHtml(planet,'habitat')}
+
+        ${buildingCardHtml(planet,'clinic')}
+        ${infrastructureUpgradeCardHtml(planet,'clinic')}
+
+        ${buildingCardHtml(planet,'entertainment')}
+        ${infrastructureUpgradeCardHtml(planet,'entertainment')}
+
+        ${buildingCardHtml(planet,'securityCenter')}
+        ${infrastructureUpgradeCardHtml(planet,'securityCenter')}
+      </div>
+    </div>
+  `;
+
+  planetMenuContent.querySelectorAll('.buildBuildingBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      startBuilding(planet,btn.dataset.building);
+    });
+  });
+
+  planetMenuContent.querySelectorAll('.cancelBuildingBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelBuilding(planet,btn.dataset.building);
+    });
+  });
+
+  planetMenuContent.querySelectorAll('.startInfraUpgradeBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      startInfrastructureUpgrade(planet,btn.dataset.upgrade);
+    });
+  });
+
+  planetMenuContent.querySelectorAll('.cancelInfraUpgradeBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      cancelInfrastructureUpgrade(planet,btn.dataset.upgrade);
+    });
+  });
+}
+
+function renderResearchTab(planet){
+  // Эта вкладка собирается по частям, чтобы ошибка в одном блоке
+  // больше не могла оставить на экране содержимое предыдущей вкладки.
+  const scanText = planet.playerScanned || planet.owner === 'player'
+    ? 'Базовые данные получены'
+    : 'Требуется завершить разведку';
+
+  let scienceBonus = 0;
+  let scienceSpeed = 1;
+  try{
+    scienceBonus = Math.round(globalScienceBonus()*100);
+    scienceSpeed = researchSpeedMultiplier();
+  }catch(err){
+    console.error('Science bonus render error:', err);
+  }
+
+  let scienceInfrastructure = '';
+  try{
+    scienceInfrastructure = scienceCenterCardHtml(planet);
+  }catch(err){
+    console.error('Science center render error:', err);
+    scienceInfrastructure = `
+      <div class="scienceCenterCard">
+        <div class="scienceCenterHead">
+          <div class="scienceCenterIcon">⚛</div>
+          <div>
+            <div class="scienceCenterTitle">Научный центр</div>
+            <div class="scienceCenterDesc">
+              Научная инфраструктура временно недоступна, но дерево исследований работает.
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const safeTechCard = (name,desc,level,cost,extra='') => {
+    try{
+      return techCard(name,desc,level,cost,extra);
+    }catch(err){
+      console.error('Tech card render error:', name, err);
+      return `
+        <div class="techCard">
+          <div class="techHead">
+            <div class="techName">${name}</div>
+            <div class="techLevel">Ур. ${level}</div>
+          </div>
+          <div class="techDesc">${desc}</div>
+          <div class="techCost">Исследование: ${cost} Ксенита${extra ? ' • ' + extra : ''}</div>
+        </div>
+      `;
+    }
+  };
+
+  const military = [
+    safeTechCard('Боевые компьютеры', 'Улучшают точность и эффективность вооружения.', 1, 25),
+    safeTechCard('Лазерное вооружение', 'Открывает улучшенные энергетические орудия.', 2, 60, 'Медь'),
+    safeTechCard('Тя

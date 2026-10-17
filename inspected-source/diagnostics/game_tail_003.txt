@@ -1,0 +1,464 @@
+и глобальных исследований.',bonus:{research:.12}},
+    {id:'geology',name:'Планетарная геология',desc:'+10% к добыче всех планетарных шахт.',bonus:{mining:.10}},
+    {id:'sensors',name:'Квантовые сенсоры',desc:'+140 к дальности обнаружения разведчиков.',bonus:{sensor:140}},
+    {id:'systems',name:'Системный анализ',desc:'+6% к исследованиям и +6% к добыче.',bonus:{research:.06,mining:.06}},
+    {id:'navigation',name:'Расчёт траекторий',desc:'+5% скорости всем кораблям.',bonus:{speed:.05}}
+  ],
+  engineer:[
+    {id:'repair',name:'Полевой ремонт',desc:'+30% к скорости ремонта кораблей.',bonus:{repair:.30}},
+    {id:'shipyard',name:'Верфи нового поколения',desc:'+12% к скорости строительства кораблей.',bonus:{shipBuild:.12}},
+    {id:'construction',name:'Модульное строительство',desc:'+10% к скорости строительства зданий.',bonus:{buildingBuild:.10}},
+    {id:'armor',name:'Усиление корпуса',desc:'−5% входящего урона вашим кораблям.',bonus:{defense:.05}},
+    {id:'drive',name:'Инженерия двигателей',desc:'+5% скорости всему флоту.',bonus:{speed:.05}}
+  ],
+  governor:[
+    {id:'growth',name:'Социальная программа',desc:'+15% к естественному росту населения.',bonus:{growth:.15}},
+    {id:'industry',name:'Промышленная кооперация',desc:'+8% к добыче ресурсов.',bonus:{mining:.08}},
+    {id:'yards',name:'Военные заказы',desc:'+6% к скорости верфей.',bonus:{shipBuild:.06}},
+    {id:'resilience',name:'Гражданская оборона',desc:'−5% входящего урона вашим кораблям.',bonus:{defense:.05}},
+    {id:'maintenance',name:'Службы снабжения',desc:'+12% к скорости ремонта.',bonus:{repair:.12}}
+  ],
+  explorer:[
+    {id:'fast',name:'Дальняя экспедиция',desc:'+8% скорости кораблей.',bonus:{speed:.08}},
+    {id:'deep',name:'Глубокое сканирование',desc:'+160 к дальности обнаружения.',bonus:{sensor:160}},
+    {id:'boarding',name:'Экспедиционный десант',desc:'Абордаж на 15% быстрее.',bonus:{boarding:.15}},
+    {id:'prospect',name:'Поиск месторождений',desc:'+5% к добыче.',bonus:{mining:.05}},
+    {id:'archive',name:'Полевой архив',desc:'+5% к исследованиям.',bonus:{research:.05}}
+  ]
+};
+
+function cloneSpecialist(def){return {...def,status:'stationed',owner:'enemy',planetId:enemyPlanet?.id||null,shipId:null,skillId:null};}
+PO.enemySpecialists=SPECIALISTS.map(cloneSpecialist);
+
+function playerBonuses(){
+  if(PO.bonusCache && PO.bonusCacheVersion===PO.bonusVersion) return PO.bonusCache;
+  const out={damage:0,speed:0,defense:0,range:0,boarding:0,research:0,mining:0,sensor:0,repair:0,shipBuild:0,buildingBuild:0,growth:0};
+  for(const p of PO.playerPersonnel){
+    if(!p.skillId) continue;
+    const sk=(SKILLS[p.role]||[]).find(x=>x.id===p.skillId); if(!sk)continue;
+    for(const [k,v] of Object.entries(sk.bonus||{})) out[k]=(out[k]||0)+v;
+  }
+  PO.bonusCache=out; PO.bonusCacheVersion=PO.bonusVersion;
+  return out;
+}
+PO.playerBonuses=playerBonuses;
+
+function enemyBonusProfile(){
+  const b={income:0,buildSpeed:0,combat:0,move:0,think:0,scoutDelay:0};
+  for(const s of PO.enemySpecialists){
+    if(s.status!=='stationed'||s.owner!=='enemy')continue;
+    if(!planets.some(p=>p.id===s.planetId&&p.owner==='enemy')) continue;
+    if(s.role==='admiral')b.combat+=.08;
+    if(s.role==='scientist'){b.income+=.05;b.think+=.05;}
+    if(s.role==='engineer')b.buildSpeed+=.10;
+    if(s.role==='governor')b.income+=.08;
+    if(s.role==='explorer'){b.move+=.07;b.scoutDelay+=.10;}
+  }
+  return b;
+}
+
+// AI specialists are real strategic assets: their bonuses disappear while they are travelling or after capture.
+const _getAIProfilePersonnel=getAIProfile;
+getAIProfile=function(){
+  const base=_getAIProfilePersonnel(); const b=enemyBonusProfile(); const p={...base};
+  p.income*=1+b.income; p.buildSpeed*=1+b.buildSpeed; p.combat*=1+b.combat; p.move*=1+b.move;
+  p.think*=Math.max(.72,1-b.think); p.scoutDelay*=Math.max(.72,1-b.scoutDelay);
+  return p;
+};
+
+// Player personnel bonuses wrap existing Living Galaxy / commander bonuses rather than replacing them.
+const _shipMoveSpeedPersonnel=shipMoveSpeed;
+shipMoveSpeed=function(ship){let v=_shipMoveSpeedPersonnel(ship);if(ship?.owner==='player')v*=1+playerBonuses().speed;return v;};
+const _miningProductionPersonnel=miningProductionMultiplier;
+miningProductionMultiplier=function(planet,type){return _miningProductionPersonnel(planet,type)*(planet?.owner==='player'?(1+playerBonuses().mining):1);};
+const _researchSpeedPersonnel=researchSpeedMultiplier;
+researchSpeedMultiplier=function(){return _researchSpeedPersonnel()*(1+playerBonuses().research);};
+const _populationGrowthPersonnel=populationGrowthPerMinute;
+populationGrowthPerMinute=function(planet){return _populationGrowthPersonnel(planet)*(planet?.owner==='player'?(1+playerBonuses().growth):1);};
+const _canScoutTargetPersonnel=canScoutTargetPlanet;
+canScoutTargetPlanet=function(ship,planet){
+  if(_canScoutTargetPersonnel(ship,planet))return true;
+  const extra=playerBonuses().sensor||0;
+  if(!extra||!ship||ship.owner!=='player'||!ship.canScan||!planet||planet.kind==='researchAsteroid')return false;
+  const origin=ship.orbitPlanet||ship;return Math.hypot(planet.x-origin.x,planet.y-origin.y)<=SCOUT_SENSOR_RANGE+extra;
+};
+
+function nearestPlayerColony(ship){let best=null,bestD=Infinity;for(const p of planets){if(p.owner!=='player')continue;const d=Math.hypot(p.x-ship.x,p.y-ship.y);if(d<bestD){bestD=d;best=p;}}return best||playerPlanet;}
+function nearestEnemyColonyForPersonnel(x,y){let best=null,bestD=Infinity;for(const p of planets){if(p.owner!=='enemy')continue;const d=Math.hypot(p.x-x,p.y-y);if(d<bestD){bestD=d;best=p;}}return best;}
+function nearestPlayerMilitary(target,max=Infinity){return scouts.filter(s=>s.owner==='player'&&isMilitaryShipType(s.type)&&!s.destroyed).map(s=>({s,d:Math.hypot(s.x-target.x,s.y-target.y)})).filter(x=>x.d<=max).sort((a,b)=>a.d-b.d)[0]?.s||null;}
+function specialistById(id){return PO.enemySpecialists.find(s=>s.id===id)||PO.playerPersonnel.find(s=>s.id===id)||null;}
+function transportSpecialist(ship){return ship?specialistById(ship._aePersonnelTransport?.specialistId):null;}
+function addBadge(ship,text='👤',captured=false){
+  if(!ship?.el)return; let b=ship.el.querySelector('.aePersonnelBadge');if(!b){b=document.createElement('span');b.className='aePersonnelBadge';ship.el.appendChild(b);}b.textContent=text;b.classList.toggle('captured',captured);
+}
+function removeBadge(ship){ship?.el?.querySelector('.aePersonnelBadge')?.remove();}
+function markTransportIdentified(ship){
+  if(!ship||ship._aePersonnelIdentified)return; ship._aePersonnelIdentified=true; const sp=transportSpecialist(ship); addBadge(ship,'👤');
+  pushEvent('РАЗВЕДДАННЫЕ: обнаружен вражеский транспорт с ценным пассажиром'+(sp?' — '+ROLE_LABELS[sp.role]+'.':'.'),'detection');
+  personnelHint('👤 Ценный транспорт обнаружен. Нажмите на него, чтобы отдать приказ на перехват.');
+}
+
+function openBoardingPanel(ship){
+  if(!ship||ship.destroyed||!ship._aePersonnelTransport)return;
+  markTransportIdentified(ship); const sp=transportSpecialist(ship); const ov=document.getElementById('aeBoardingOverlay'),body=document.getElementById('aeBoardingBody'),actions=document.getElementById('aeBoardingActions');
+  document.getElementById('aeBoardingTitle').textContent=ship._aeBoardingReady?'Транспорт обездвижен':'Ценный транспорт';
+  document.getElementById('aeBoardingSub').textContent=(sp?ROLE_ICONS[sp.role]+' '+ROLE_LABELS[sp.role]+' • '+sp.rarity:'ценный пассажир')+' • корпус '+Math.ceil(ship.hp)+'/'+Math.ceil(ship.maxHp);
+  const boarding=PO.boarding&&PO.boarding.targetId===ship.id?PO.boarding:null;
+  body.innerHTML='<div class="aeBoardingIntel">На борту находится <b>'+(sp?sp.name:'неизвестный специалист')+'</b>.<br>'+(ship._aeBoardingReady?'Корпус транспорта повреждён до критического уровня. Теперь его можно взять на абордаж.':'Чтобы захватить пассажира, перехватите транспорт и снизьте прочность корпуса примерно до <b>25%</b>. Автоматический огонь остановится до уничтожения цели.')+'</div>'+(boarding?'<div class="aeBoardProgress"><div class="aeBoardProgressText"><span>Абордаж</span><b>'+Math.ceil(boarding.remaining)+' сек.</b></div><div class="aeBoardProgressTrack"><i style="width:'+((1-boarding.remaining/boarding.total)*100).toFixed(1)+'%"></i></div></div>':'');
+  actions.innerHTML='';
+  if(boarding){const wait=document.createElement('button');wait.disabled=true;wait.innerHTML='Абордаж выполняется…<small>Держите штурмовой корабль рядом и не дайте противнику его уничтожить.</small>';actions.appendChild(wait);}
+  else if(ship._aeBoardingReady){
+    const candidate=nearestPlayerMilitary(ship,110); const btn=document.createElement('button');btn.disabled=!candidate;btn.innerHTML=candidate?'⚔ Начать абордаж кораблём «'+candidate.name+'»<small>Штурм займёт несколько секунд. После захвата специалиста корабль сам повезёт его на ближайшую колонию.</small>':'Подведите боевой корабль ближе<small>Для абордажа нужен ваш военный корабль в радиусе 110.</small>';btn.addEventListener('click',()=>candidate&&startBoarding(ship,candidate));actions.appendChild(btn);
+  }else{
+    const candidate=nearestPlayerMilitary(ship); const btn=document.createElement('button');btn.disabled=!candidate;btn.innerHTML=candidate?'🎯 Перехватить кораблём «'+candidate.name+'»<small>Ближайший боевой корабль получит прямой приказ атаковать транспорт.</small>':'Нет доступного боевого корабля<small>Сначала постройте или подведите военный корабль.</small>';btn.addEventListener('click',()=>{if(candidate){beginCombat(candidate,ship,false);closeBoardingPanel();pushEvent(candidate.name+' получил приказ перехватить ценный транспорт.','detection');}});actions.appendChild(btn);
+  }
+  ov.classList.add('open');ov.setAttribute('aria-hidden','false');
+}
+function closeBoardingPanel(){const ov=document.getElementById('aeBoardingOverlay');ov.classList.remove('open');ov.setAttribute('aria-hidden','true');}
+document.getElementById('aeBoardingClose').addEventListener('click',closeBoardingPanel);document.getElementById('aeBoardingOverlay').addEventListener('pointerdown',e=>{if(e.target.id==='aeBoardingOverlay')closeBoardingPanel();else e.stopPropagation();});
+
+function disablePersonnelTransport(target){
+  if(!target||target._aeBoardingReady)return;target._aeBoardingReady=true;target._aePersonnelIdentified=true;target.stationary=true;target.targetPlanet=null;target.targetPoint=null;target.combatTarget=null;target.patrolState=null;target.orbitPlanet=null;target.el?.classList.add('aeDisabledTransport');addBadge(target,'⚠');
+  scouts.forEach(s=>{if(s.owner==='player'&&s.combatTarget===target){s.combatTarget=null;s.stationary=true;}});
+  const sp=transportSpecialist(target);pushEvent('ЦЕЛЬ ОБЕЗДВИЖЕНА: транспорт с '+(sp?ROLE_LABELS[sp.role].toLowerCase():'ценным пассажиром')+' готов к абордажу.','success');personnelHint('⚔ Транспорт обездвижен. Нажмите на него и начните абордаж.');
+}
+
+// Clamp player damage at the boarding threshold instead of accidentally destroying the valuable passenger.
+const _damageShipPersonnel=damageShip;
+damageShip=function(target,amount,attacker){
+  let dmg=amount;
+  const pb=playerBonuses(); if(attacker?.owner==='player')dmg*=1+pb.damage;if(target?.owner==='player')dmg*=Math.max(.5,1-pb.defense);
+  if(target?._aePersonnelTransport&&target.owner==='enemy'&&attacker?.owner==='player'){
+    if(target._aeBoardingReady)return;
+    const floor=Math.max(1,(target.maxHp||1)*.23); const current=target.hp??target.maxHp??1;
+    if(current-dmg<=floor){const safe=Math.max(.01,current-floor);_damageShipPersonnel(target,safe,attacker);disablePersonnelTransport(target);return;}
+  }
+  return _damageShipPersonnel(target,dmg,attacker);
+};
+
+function startBoarding(target,attacker){
+  if(!target?._aeBoardingReady||!attacker||attacker.destroyed)return;const b=playerBonuses();const total=Math.max(5,12*(1-Math.min(.55,b.boarding||0)));
+  attacker.combatTarget=null;attacker.targetPlanet=null;attacker.targetPoint=null;attacker.stationary=true;target.stationary=true;PO.boarding={targetId:target.id,attackerId:attacker.id,remaining:total,total};closeBoardingPanel();pushEvent('АБОРДАЖ: «'+attacker.name+'» штурмует обездвиженный транспорт.','attack');
+}
+function removeCapturedTransport(ship){
+  if(!ship||ship.destroyed)return;ship.destroyed=true;removePatrolVisual(ship);removeShipFromFleetGroups(ship.id);ship.el?.remove();ship.timerEl?.remove();const i=scouts.indexOf(ship);if(i>=0)scouts.splice(i,1);scouts.forEach(s=>{if(s.combatTarget===ship)s.combatTarget=null;});
+}
+function finishBoarding(target,attacker){
+  const sp=transportSpecialist(target);if(!sp)return;sp.owner='player';sp.status='captured';sp.shipId=attacker.id;sp.planetId=null;attacker._aeCapturedSpecialistId=sp.id;addBadge(attacker,'👤',true);removeCapturedTransport(target);PO.boarding=null;
+  const home=nearestPlayerColony(attacker);attacker.stationary=false;setScoutTarget(attacker,home,{silent:true});pushEvent('СПЕЦИАЛИСТ ЗАХВАЧЕН: '+sp.name+'. «'+attacker.name+'» везёт пленного на «'+home.name+'».','success');personnelHint('👤 Специалист захвачен. Не потеряйте корабль до возвращения на колонию!');
+}
+function updateBoarding(dt){
+  const b=PO.boarding;if(!b)return;const target=scouts.find(s=>s.id===b.targetId),attacker=scouts.find(s=>s.id===b.attackerId);
+  if(!target||target.destroyed||!attacker||attacker.destroyed){PO.boarding=null;pushEvent('Абордаж сорван: один из кораблей потерян.','attack');return;}
+  if(Math.hypot(target.x-attacker.x,target.y-attacker.y)>115){PO.boarding=null;pushEvent('Абордаж сорван: штурмовой корабль отошёл слишком далеко.','attack');return;}
+  b.remaining=Math.max(0,b.remaining-dt);if(b.remaining<=0)finishBoarding(target,attacker);
+  if(document.getElementById('aeBoardingOverlay').classList.contains('open'))openBoardingPanel(target);
+}
+
+function attachTransportTap(ship){
+  ship.el?.addEventListener('pointerdown',e=>{if(!gameStarted||ship.destroyed||!ship._aePersonnelTransport)return;e.preventDefault();e.stopPropagation();openBoardingPanel(ship);},{passive:false});
+}
+function spawnPersonnelTransfer(){
+  const colonies=planets.filter(p=>p.owner==='enemy');if(colonies.length<2)return false;if(scouts.some(s=>s.owner==='enemy'&&s._aePersonnelTransport&&!s.destroyed))return false;
+  const candidates=PO.enemySpecialists.filter(s=>s.owner==='enemy'&&s.status==='stationed');if(!candidates.length)return false;const sp=candidates[Math.floor(Math.random()*candidates.length)];let source=colonies.find(p=>p.id===sp.planetId)||colonies[0];const targets=colonies.filter(p=>p!==source);if(!targets.length)return false;const dest=targets[Math.floor(Math.random()*targets.length)];
+  const ship=makeBuiltShip('enemy',source,'cargo');ship.name='Служебный транспорт '+(++PO.transportSerial);ship._aePersonnelTransport={specialistId:sp.id,destinationId:dest.id};sp.status='transit';sp.shipId=ship.id;sp.planetId=null;setScoutTarget(ship,dest,{silent:true});attachTransportTap(ship);
+  if(!gameSettings.fog)markTransportIdentified(ship);return true;
+}
+function identifyPersonnelTransports(){
+  for(const ship of scouts){if(ship.owner!=='enemy'||ship.destroyed||!ship._aePersonnelTransport)continue;if(ship._aePersonnelIdentified)continue;const closeScout=scouts.some(s=>s.owner==='player'&&!s.destroyed&&((s.type==='scout'&&Math.hypot(s.x-ship.x,s.y-ship.y)<340)||Math.hypot(s.x-ship.x,s.y-ship.y)<175));if(closeScout)markTransportIdentified(ship);}
+}
+function reconcileEnemySpecialists(){
+  for(const sp of PO.enemySpecialists){
+    if(sp.owner!=='enemy') continue;
+    if(sp.status==='stationed'){
+      const station=planets.find(p=>p.id===sp.planetId&&p.owner==='enemy');
+      if(!station){
+        const fallback=nearestEnemyColonyForPersonnel(enemyPlanet?.x||0,enemyPlanet?.y||0);
+        if(fallback) sp.planetId=fallback.id;
+        else {sp.status='lost';sp.owner='none';sp.planetId=null;sp.shipId=null;}
+      }
+    }else if(sp.status==='transit'){
+      const carrier=scouts.find(s=>s.id===sp.shipId&&!s.destroyed&&s._aePersonnelTransport?.specialistId===sp.id);
+      if(!carrier){sp.status='lost';sp.owner='none';sp.shipId=null;sp.planetId=null;}
+    }
+  }
+}
+function finishEnemyTransfers(){
+  for(const ship of scouts){
+    if(ship.owner!=='enemy'||ship.destroyed||!ship._aePersonnelTransport||ship._aeBoardingReady)continue;
+    const meta=ship._aePersonnelTransport;
+    let destination=planets.find(p=>p.id===meta.destinationId&&p.owner==='enemy');
+    if(!destination){
+      destination=nearestEnemyColonyForPersonnel(ship.x,ship.y);
+      if(destination){
+        meta.destinationId=destination.id;
+        if(ship.targetPlanet!==destination) setScoutTarget(ship,destination,{silent:true});
+        continue;
+      }
+      const sp=specialistById(meta.specialistId);
+      if(sp){sp.status='lost';sp.owner='none';sp.shipId=null;sp.planetId=null;}
+      ship._aePersonnelTransport=null;removeBadge(ship);continue;
+    }
+    if(ship.orbitPlanet===destination&&!ship.targetPlanet){
+      const sp=specialistById(meta.specialistId);
+      if(sp&&sp.owner==='enemy'){sp.status='stationed';sp.planetId=destination.id;sp.shipId=null;}
+      ship._aePersonnelTransport=null;removeBadge(ship);
+      if(!gameSettings.fog)pushEvent('Наблюдение: служебный транспорт противника прибыл на колонию.','discovery');
+    }
+  }
+}
+
+// If the carrier with a captured specialist is destroyed before reaching home, the specialist is lost.
+const _destroyShipPersonnel=destroyShip;
+destroyShip=function(ship,killer){
+  if(!ship || ship.destroyed) return _destroyShipPersonnel(ship,killer);
+
+  // Снимаем временные привязки до удаления DOM/массива кораблей.
+  if(ship._aeAnomalyTargetId) releaseShipSignalAssignment(ship);
+  if(ship._aeSignalDelivery){
+    pushEvent('ПОТЕРЯ НАХОДКИ: «'+ship.name+'» был уничтожен до доставки груза с неизвестного сигнала.','attack');
+    ship._aeSignalDelivery=null;
+  }
+  if(ship.type==='repair') clearRepair(ship);
+  if(ship._aeRepairingBy){
+    const repair=scouts.find(s=>s.id===ship._aeRepairingBy);
+    if(repair) clearRepair(repair);
+    ship._aeRepairingBy=null;
+  }
+  if(ship._aePersonnelTransport){
+    const sp=transportSpecialist(ship);
+    if(sp&&sp.status==='transit'){
+      sp.status='lost';sp.owner='none';sp.shipId=null;sp.planetId=null;
+      if(ship._aePersonnelIdentified) pushEvent('ЦЕННЫЙ ПАССАЖИР ПОТЕРЯН: транспорт «'+ship.name+'» уничтожен.','attack');
+    }
+  }
+  if(ship._aeCapturedSpecialistId){
+    const sp=specialistById(ship._aeCapturedSpecialistId);
+    if(sp){sp.status='lost';sp.owner='none';sp.shipId=null;pushEvent('ПОТЕРЯ СПЕЦИАЛИСТА: '+sp.name+' погиб или пропал вместе с «'+ship.name+'».','attack');}
+    ship._aeCapturedSpecialistId=null;
+  }
+  return _destroyShipPersonnel(ship,killer);
+};
+function deliverCapturedSpecialists(){
+  for(const ship of scouts){const id=ship._aeCapturedSpecialistId;if(!id||ship.destroyed||ship.owner!=='player')continue;if(ship.orbitPlanet?.owner==='player'&&!ship.targetPlanet){const sp=specialistById(id);if(!sp)continue;sp.status='player';sp.owner='player';sp.shipId=null;sp.planetId=ship.orbitPlanet.id;ship._aeCapturedSpecialistId=null;removeBadge(ship);if(!PO.playerPersonnel.some(x=>x.id===sp.id))PO.playerPersonnel.push(sp);pushEvent('НОВЫЙ СПЕЦИАЛИСТ: '+sp.name+' доставлен на «'+ship.orbitPlanet.name+'». Выберите его специализацию в разделе «Цивилизация» любой колонии.','success');personnelHint('👤 Специалист доставлен. Откройте управление планетой → «Цивилизация» и выберите один из 5 навыков.');if(currentFleetPlanet?.owner==='player'&&currentPlanetTab==='civilization')renderPlanetMenuTab(currentFleetPlanet);}}
+}
+
+function selectPersonnelSkill(id,skillId){const p=PO.playerPersonnel.find(x=>x.id===id);if(!p||p.skillId)return;const sk=(SKILLS[p.role]||[]).find(x=>x.id===skillId);if(!sk)return;p.skillId=skillId;PO.bonusVersion++;pushEvent(p.name+' получил специализацию «'+sk.name+'»: '+sk.desc,'success');applyRangeBonuses();if(currentFleetPlanet?.owner==='player'&&currentPlanetTab==='civilization')renderPlanetMenuTab(currentFleetPlanet);}
+function personnelHtml(){
+  if(!PO.playerPersonnel.length)return '<div class="planetMenuGroup aePersonnelSection"><div class="planetMenuGroupTitle">👤 Специалисты империи</div><div class="facilityDesc">Пока нет захваченных специалистов. Разведывайте маршруты противника: иногда между его колониями летят служебные транспорты с ценными пассажирами.</div></div>';
+  return '<div class="planetMenuGroup aePersonnelSection"><div class="planetMenuGroupTitle">👤 Специалисты империи</div><div class="facilityDesc">У каждого специалиста можно один раз выбрать <b>один из пяти</b> глобальных навыков. Бонус действует на всю империю.</div>'+PO.playerPersonnel.map(p=>{const skills=SKILLS[p.role]||[];const chosen=skills.find(s=>s.id===p.skillId);return '<div class="aePersonnelCard"><div class="aePersonnelCardHead"><div><b>'+ROLE_ICONS[p.role]+' '+p.name+'</b><small>'+p.rarity+' специалист</small></div><span class="aePersonnelRole">'+ROLE_LABELS[p.role]+'</span></div>'+(chosen?'<div class="aeChosenSkill"><b>'+chosen.name+'</b><br>'+chosen.desc+'</div>':'<small>Выберите специализацию:</small><div class="aeSkillGrid">'+skills.map(sk=>'<button type="button" class="aeSkillBtn" data-person="'+p.id+'" data-skill="'+sk.id+'"><b>'+sk.name+'</b><span>'+sk.desc+'</span></button>').join('')+'</div>')+'</div>';}).join('')+'</div>';
+}
+const _renderCivilizationPersonnel=renderCivilizationTab;
+renderCivilizationTab=function(planet){_renderCivilizationPersonnel(planet);if(planet?.owner==='player'){planetMenuContent.insertAdjacentHTML('beforeend',personnelHtml());planetMenuContent.querySelectorAll('.aeSkillBtn').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();selectPersonnelSkill(btn.dataset.person,btn.dataset.skill);}));}};
+
+function applyRangeBonuses(){const b=playerBonuses();for(const s of scouts){if(s.owner!=='player')continue;if(s._aePersonnelBaseRange==null)s._aePersonnelBaseRange=s.attackRange||15;s.attackRange=s._aePersonnelBaseRange*(1+b.range);}}
+
+// Repair vessel: remains in orbit and services damaged friendly ships around its home colony.
+const _makeBuiltShipRepair=makeBuiltShip;
+makeBuiltShip=function(owner,planet,type){const ship=_makeBuiltShipRepair(owner,planet,type);if(type==='repair'){ship.repairRate=SHIP_DEFS.repair.repairRate||11;ship._aeRepairTargetId=null;ship.homePlanet=planet;if(owner==='player')pushEvent(ship.name+' введено в строй. Оно автоматически ремонтирует повреждённые корабли у «'+planet.name+'».','success');}return ship;};
+const repairBeams=new Map();
+function clearRepair(repair){if(!repair)return;const id=repair._aeRepairTargetId;if(id){const t=scouts.find(s=>s.id===id);if(t&&t._aeRepairingBy===repair.id){t._aeRepairingBy=null;t.el?.classList.remove('aeRepairingGlow');}}repair._aeRepairTargetId=null;const b=repairBeams.get(repair.id);if(b){b.remove();repairBeams.delete(repair.id);}}
+function updateRepairBeam(repair,target){let beam=repairBeams.get(repair.id);if(!beam){beam=document.createElement('div');beam.className='aeRepairBeam';world.appendChild(beam);repairBeams.set(repair.id,beam);}const dx=target.x-repair.x,dy=target.y-repair.y,d=Math.hypot(dx,dy);beam.style.left=repair.x+'px';beam.style.top=repair.y+'px';beam.style.width=d+'px';beam.style.transform='rotate('+Math.atan2(dy,dx)+'rad)';}
+function repairCandidates(repair,planet){return scouts.filter(s=>s!==repair&&s.owner===repair.owner&&!s.destroyed&&(s.hp??s.maxHp)<(s.maxHp||1)-.1&&Math.hypot(s.x-planet.x,s.y-planet.y)<=125&&!s.targetPlanet&&!s.targetPoint).sort((a,b)=>(a.hp/a.maxHp)-(b.hp/b.maxHp));}
+function updateRepairs(dt){
+  const busyTargets=new Set();for(const repair of scouts.filter(s=>s.type==='repair'&&!s.destroyed&&s.owner==='player')){
+    const planet=repair.orbitPlanet?.owner==='player'?repair.orbitPlanet:(repair.homePlanet?.owner==='player'&&Math.hypot(repair.x-repair.homePlanet.x,repair.y-repair.homePlanet.y)<130?repair.homePlanet:null);if(!planet||repair.targetPlanet||repair.combatTarget){clearRepair(repair);continue;}
+    let target=scouts.find(s=>s.id===repair._aeRepairTargetId&&!s.destroyed);if(!target||target.hp>=target.maxHp||Math.hypot(target.x-planet.x,target.y-planet.y)>130){if(target&&target.hp>=target.maxHp-.1)pushEvent('🔧 «'+target.name+'» полностью отремонтирован у «'+planet.name+'».','success');clearRepair(repair);target=null;}
+    if(!target){target=repairCandidates(repair,planet).find(s=>!busyTargets.has(s.id));if(target){repair._aeRepairTargetId=target.id;target._aeRepairingBy=repair.id;target.el?.classList.add('aeRepairingGlow');}}
+    if(target){busyTargets.add(target.id);const rate=(repair.repairRate||11)*(1+playerBonuses().repair);target.hp=Math.min(target.maxHp,target.hp+rate*dt);updateRepairBeam(repair,target);}
+  }
+}
+const _shipStatusRepair=shipStatusText;
+shipStatusText=function(ship){if(ship?._aeRepairTargetId){const t=scouts.find(s=>s.id===ship._aeRepairTargetId);return '🔧 Ремонтирует «'+(t?.name||'корабль')+'»';}if(ship?._aeRepairingBy)return '🔧 Идёт ремонт корпуса • '+Math.ceil(ship.hp)+'/'+Math.ceil(ship.maxHp);if(ship?._aeCapturedSpecialistId){const sp=specialistById(ship._aeCapturedSpecialistId);return '👤 Перевозит захваченного специалиста'+(sp?' — '+sp.name:'');}return _shipStatusRepair(ship);};
+
+function slowPersonnelTick(dtGame,now){
+  if(!gameStarted)return;reconcileEnemySpecialists();identifyPersonnelTransports();finishEnemyTransfers();deliverCapturedSpecialists();applyRangeBonuses();
+  if(gameElapsed>=PO.nextTransferAt){const ok=spawnPersonnelTransfer();PO.nextTransferAt=gameElapsed+(ok?(155+Math.random()*95):45);}
+  const b=playerBonuses();if(dtGame>0&&(b.shipBuild||b.buildingBuild)){for(const p of planets){if(p.owner!=='player')continue;if(b.shipBuild&&p.shipQueue)p.shipQueue.remaining=Math.max(0,p.shipQueue.remaining-dtGame*b.shipBuild);if(b.buildingBuild)Object.values(p.buildingQueues||{}).forEach(q=>q.remaining=Math.max(0,q.remaining-dtGame*b.buildingBuild));}}
+}
+
+function personnelTick(dtGame,now){
+  if(!gameStarted)return;
+  updateBoarding(dtGame);
+  // Ремонт не требует 60 полных проходов по флоту в секунду. 10 Гц визуально
+  // достаточно, а на больших флотах заметно снижает нагрузку на телефон.
+  PO.repairAccumulator += Math.max(0,dtGame||0);
+  if(PO.repairAccumulator >= .10){
+    const repairDt=Math.min(.35,PO.repairAccumulator);PO.repairAccumulator=0;updateRepairs(repairDt);
+  }
+  if(now-PO.lastSlowTick>=500){const elapsed=Math.max(0,(now-PO.lastSlowTick)/1000);PO.lastSlowTick=now;slowPersonnelTick(Math.min(1,elapsed)*gameSpeed,now);}
+}
+
+// Central scheduler: Living Galaxy + personnel + repairs now share the main game loop.
+const previousCentral=window.AECentralTick;
+window.AECentralTick=function(dtGame,now){if(previousCentral)previousCentral(dtGame,now);if(living?.tick)living.tick();personnelTick(dtGame,now);};
+PO.initialized=true;
+pushEvent && gameStarted && pushEvent('Системы персонала, абордажа и орбитального ремонта активированы.','discovery');
+})();
+</script>
+
+
+<style id="aeFleetSignalUsabilityFixStyles">
+/* Mobile usability: larger ship hit area, same visual ship size. */
+.unitShip{width:36px!important;height:36px!important;}
+.unitShip .worldShipImg{width:26px!important;height:26px!important;}
+.aeAnomaly.ready .aeAnomalyLabel{top:52px!important;color:#fff0a8!important;font-weight:900;}
+</style>
+
+<style id="aeAttackRangeCircleStyles">
+#aeAttackRangeLayer{
+  position:absolute;
+  inset:0;
+  z-index:23;
+  pointer-events:none;
+  overflow:visible;
+}
+#aeAttackRangeCircle{
+  position:absolute;
+  display:none;
+  transform:translate(-50%,-50%);
+  box-sizing:border-box;
+  border-radius:50%;
+  border:1.5px solid rgba(103,220,255,.78);
+  background:radial-gradient(circle,rgba(88,205,255,.025) 0 56%,rgba(88,205,255,.085) 100%);
+  box-shadow:0 0 8px rgba(71,194,255,.22),inset 0 0 12px rgba(71,194,255,.08);
+}
+#aeAttackRangeCircle::after{
+  content:"";
+  position:absolute;
+  inset:4px;
+  border-radius:50%;
+  border:1px dashed rgba(162,239,255,.24);
+}
+#aeAttackRangeLabel{
+  position:absolute;
+  left:50%;
+  top:-17px;
+  transform:translateX(-50%);
+  min-width:max-content;
+  padding:2px 6px;
+  border-radius:999px;
+  border:1px solid rgba(113,220,255,.28);
+  background:rgba(5,22,36,.82);
+  color:#c9f6ff;
+  font-size:8px;
+  font-weight:850;
+  line-height:1.35;
+  white-space:nowrap;
+  text-shadow:0 1px 2px #000;
+  box-shadow:0 2px 7px rgba(0,0,0,.3);
+}
+body.effects-minimal #aeAttackRangeCircle,
+body.power-saver #aeAttackRangeCircle{
+  box-shadow:none;
+  background:rgba(88,205,255,.035);
+}
+</style>
+<script id="aeAttackRangeCircleScript">
+(()=>{
+'use strict';
+if(typeof world==='undefined' || !world || typeof isMilitaryShipType!=='function') return;
+
+const layer=document.createElement('div');
+layer.id='aeAttackRangeLayer';
+const ring=document.createElement('div');
+ring.id='aeAttackRangeCircle';
+const label=document.createElement('div');
+label.id='aeAttackRangeLabel';
+ring.appendChild(label);
+layer.appendChild(ring);
+const combatLayer=document.getElementById('combatFxLayer');
+if(combatLayer && combatLayer.parentNode===world) world.insertBefore(layer,combatLayer);
+else world.appendChild(layer);
+
+function selectedRangeShip(){
+  if(typeof controlledShip!=='undefined' && controlledShip && !controlledShip.destroyed && controlledShip.owner==='player' && isMilitaryShipType(controlledShip.type)){
+    return controlledShip;
+  }
+  if(typeof selectedFleet!=='undefined' && Array.isArray(selectedFleet) && selectedFleet.length===1){
+    const s=selectedFleet[0];
+    if(s && !s.destroyed && s.owner==='player' && isMilitaryShipType(s.type)) return s;
+  }
+  return null;
+}
+
+function hideAttackRangeCircle(){
+  ring.style.display='none';
+  ring.dataset.shipId='';
+}
+
+function updateAttackRangeCircle(ship=null){
+  const target=ship && !ship.destroyed && ship.owner==='player' && isMilitaryShipType(ship.type)
+    ? ship
+    : selectedRangeShip();
+  if(!target){ hideAttackRangeCircle(); return; }
+
+  const range=Math.max(0,Number(target.attackRange)||0);
+  if(range<=0){ hideAttackRangeCircle(); return; }
+
+  const diameter=range*2;
+  ring.style.display='block';
+  ring.style.left=target.x+'px';
+  ring.style.top=target.y+'px';
+  ring.style.width=diameter+'px';
+  ring.style.height=diameter+'px';
+  ring.dataset.shipId=String(target.id||'');
+  const rounded=Math.round(range*10)/10;
+  label.textContent='Дальность '+(Number.isInteger(rounded)?rounded.toFixed(0):rounded.toFixed(1));
+}
+
+const previousOpenShipControl=openShipControl;
+openShipControl=function(ship){
+  const result=previousOpenShipControl(ship);
+  updateAttackRangeCircle(ship);
+  return result;
+};
+
+const previousCloseShipControl=closeShipControl;
+closeShipControl=function(){
+  const result=previousCloseShipControl();
+  updateAttackRangeCircle();
+  return result;
+};
+
+const previousUpdateScoutElement=updateScoutElement;
+updateScoutElement=function(ship){
+  const result=previousUpdateScoutElement(ship);
+  const target=selectedRangeShip();
+  if(target===ship) updateAttackRangeCircle(target);
+  else if(!target) hideAttackRangeCircle();
+  return result;
+};
+
+const previousChooseFleetForTravel=chooseFleetForTravel;
+chooseFleetForTravel=function(ships){
+  const result=previousChooseFleetForTravel(ships);
+  updateAttackRangeCircle();
+  return result;
+};
+
+const previousClearSelectedFleet=clearSelectedFleet;
+clearSelectedFleet=function(){
+  const result=previousClearSelectedFleet();
+  updateAttackRangeCircle();
+  return result;
+};
+
+// Кнопка закрытия была подписана на старую ссылку closeShipControl ещё при загрузке,
+// поэтому добавляем лёгкую синхронизацию и сюда.
+if(typeof shipControlClose!=='undefined' && shipControlClose){
+  shipControlClose.addEventListener('click',()=>setTimeout(updateAttackRangeCircle,0));
+}
+if(typeof shipControlOverlay!=='undefined' && shipControlOverlay){
+  shipControlOverlay.addEventListener('pointerdown',e=>{
+    if(e.target===shipControlOverlay) setTimeout(updateAttackRangeCircle,0);
+  });
+}
+
+window.AEAttackRangeCircle={update:updateAttackRangeCircle,hide:hideAttackRangeCircle};
+})();
+</script>
+
+
+</body>
+</html>

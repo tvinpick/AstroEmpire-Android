@@ -1,0 +1,3259 @@
+жёлые корабли', 'Открывает новые классы тяжёлого флота.', 3, 150, 'Титан'),
+    safeTechCard('Сверхтяжёлый флот', 'Дредноуты и Титаны.', 5, 700, 'Осмий • Рений')
+  ].join('');
+
+  const economy = [
+    safeTechCard('Эффективные шахты', 'Повышает скорость добычи полезных ископаемых.', 1, 25),
+    safeTechCard('Автоматизация', 'Снижает потребность в рабочей силе и повышает производство.', 2, 60, 'Алюминий'),
+    safeTechCard('Промышленные комплексы', 'Увеличивает переработку и скорость строительства.', 3, 150, 'Кобальт'),
+    safeTechCard('Мегапромышленность', 'Максимальная производительность развитых колоний.', 5, 700, 'Родий')
+  ].join('');
+
+  const defense = [
+    safeTechCard('Орбитальная оборона', 'Улучшает защиту колоний и орбитальных объектов.', 1, 25),
+    safeTechCard('Противоракетные системы', 'Снижает урон от ракетных атак.', 2, 60, 'Никель'),
+    safeTechCard('Планетарные щиты', 'Создаёт мощные защитные системы вокруг важных миров.', 4, 350, 'Титан • Серебро'),
+    safeTechCard('Крепость планеты', 'Поздний уровень обороны стратегических систем.', 5, 700, 'Осмий')
+  ].join('');
+
+  const engines = [
+    safeTechCard('Улучшенные двигатели', 'Повышает скорость кораблей.', 1, 25),
+    safeTechCard('Дальние перелёты', 'Повышает автономность экспедиций.', 2, 60, 'Алюминий'),
+    safeTechCard('Тяжёлая логистика', 'Повышает грузоподъёмность транспортов и ковчегов.', 3, 150, 'Платина'),
+    safeTechCard('Экзотические двигатели', 'Технологии для сверхтяжёлого флота.', 5, 700, 'Рений')
+  ].join('');
+
+  const colonization = [
+    safeTechCard('Жизнеобеспечение', 'Улучшает воду, воздух и базовую выживаемость колонии.', 1, 25),
+    safeTechCard('Колонизационные модули', 'Повышает вместимость колонизационных кораблей.', 2, 60, 'Кальций'),
+    safeTechCard('Ускоренный рост населения', 'Повышает рост развитых колоний.', 3, 150, 'Серебро'),
+    safeTechCard('Терраформирование', 'Поздняя технология изменения условий планеты.', 5, 700, 'Торий')
+  ].join('');
+
+  const exploration = [
+    safeTechCard('Планетология', `Ускоряет исследование планет. Сейчас: ${scanText}.`, 1, 25),
+    safeTechCard('Улучшенные сенсоры', 'Увеличивает радиус обнаружения объектов в тумане.', 2, 60, 'Медь'),
+    safeTechCard('Глубокое сканирование', 'Повышает скорость обнаружения редких ресурсов.', 3, 150, 'Платина'),
+    safeTechCard('Квантовые сенсоры', 'Максимальная разведка поздней игры.', 5, 700, 'Алмаз • Пейнит')
+  ].join('');
+
+  planetMenuContent.innerHTML = `
+    <div class="researchCurrency">
+      <div>
+        <div class="researchCurrencyName">Исследовательский ресурс • Ксенит</div>
+        <div class="scienceGlobalBonus">Скорость исследований: ×${scienceSpeed.toFixed(2)} • +${scienceBonus}%</div>
+      </div>
+      <div class="researchCurrencyValue">${Math.floor(Number(playerKsenit) || 0)}</div>
+    </div>
+
+    <div class="planetMenuGroup theme-research-core">
+      <div class="planetMenuGroupTitle">Научная инфраструктура</div>
+      ${scienceInfrastructure}
+      <div class="scienceCenterNote">
+        Научные центры не производят Ксенит. Они ускоряют исследования всей империи.
+        Бонусы центров на разных колониях складываются.
+      </div>
+    </div>
+
+    <div class="researchResourceNote">
+      <b>Основной ресурс исследований — Ксенит.</b><br>
+      Его добывают специальные корабли на астероидах. Высокие уровни технологий
+      дополнительно требуют обычные и редкие ресурсы.
+    </div>
+
+    <div class="planetMenuGroup theme-research-military">
+      <div class="planetMenuGroupTitle">Военные технологии</div>
+      <div class="techGrid">${military}</div>
+    </div>
+
+    <div class="planetMenuGroup theme-research-economy">
+      <div class="planetMenuGroupTitle">Экономика</div>
+      <div class="techGrid">${economy}</div>
+    </div>
+
+    <div class="planetMenuGroup theme-research-defense">
+      <div class="planetMenuGroupTitle">Защитные технологии</div>
+      <div class="techGrid">${defense}</div>
+    </div>
+
+    <div class="planetMenuGroup theme-research-engines">
+      <div class="planetMenuGroupTitle">Двигатели и логистика</div>
+      <div class="techGrid">${engines}</div>
+    </div>
+
+    <div class="planetMenuGroup theme-research-colonization">
+      <div class="planetMenuGroupTitle">Колонизация</div>
+      <div class="techGrid">${colonization}</div>
+    </div>
+
+    <div class="planetMenuGroup theme-research-exploration">
+      <div class="planetMenuGroupTitle">Наука и разведка</div>
+      <div class="techGrid">${exploration}</div>
+    </div>
+  `;
+
+  try{
+    bindResearchButtons(planet);
+  }catch(err){
+    console.error('Research button bind error:', err);
+  }
+}
+
+
+const CARGO_DEFAULT_CAPACITY = 500;
+let cargoSourcePlanet = null;
+
+function availableColonizersAtPlanet(planet){
+  return fleetAtPlanet(planet).filter(ship =>
+    ship.owner === 'player' &&
+    ship.type === 'colonizer' &&
+    !ship.resourceTransport
+  );
+}
+
+function availableCargoShipsAtPlanet(planet){
+  return fleetAtPlanet(planet).filter(ship =>
+    ship.owner === 'player' &&
+    ship.type === 'cargo' &&
+    !ship.resourceTransport
+  );
+}
+
+function playerColonies(){
+  return planets.filter(p => p.owner === 'player');
+}
+
+function refreshPlanetSpecialActions(planet, localFleet=fleetAtPlanet(planet)){
+  const colonizers = localFleet.filter(s => s.owner === 'player' && s.type === 'colonizer');
+  const usableColonizer = colonizers
+    .filter(s => (s.colonists || 0) >= 100)
+    .sort((a,b)=>(b.colonists||0)-(a.colonists||0))[0] || null;
+
+  const canColonize =
+    planet.owner === 'neutral' &&
+    planet.playerScanned &&
+    planet.habitable &&
+    colonizers.length > 0;
+
+  planetColonizeBtn.hidden = !canColonize;
+  if(canColonize){
+    const settlers = usableColonizer?.colonists || 0;
+    planetColonizeBtn.disabled = !usableColonizer;
+    planetColonizeBtn.textContent = usableColonizer
+      ? 'Колонизировать • ' + settlers + ' колонистов'
+      : 'На корабле недостаточно колонистов';
+  }
+
+  // Внутренняя логистика между собственными колониями теперь абстрагирована:
+  // все добытые ресурсы входят в единый имперский резерв и доступны на любой колонии.
+  // Грузовые корабли остаются в игре для будущих внешних/специальных логистических задач.
+  planetCargoBtn.hidden = true;
+  planetCargoBtn.disabled = true;
+}
+
+function colonizePlayerPlanet(planet){
+  if(!planet || planet.owner !== 'neutral' || !planet.playerScanned || !planet.habitable) return;
+
+  const ship = availableColonizersAtPlanet(planet)
+    .filter(s => (s.colonists || 0) >= 100)
+    .sort((a,b)=>(b.colonists||0)-(a.colonists||0))[0];
+
+  if(!ship){
+    pushEvent('На орбите нет готового колонизационного корабля с колонистами.', 'discovery');
+    return;
+  }
+
+  const settlers = Math.max(100,Math.floor(ship.colonists || 0));
+
+  planet.owner = 'player';
+  planet.population = settlers;
+  planet.civilizationLevel = 1;
+  planet.playerScanned = true;
+  planet.playerDiscoveredResources = [...planet.resources];
+  planet.stockpile = colonyMineStarterStockpile(planet);
+  planet.colonyStarterMineKit = true;
+
+  // Колонизационный корабль становится первым колониальным центром.
+  planet.buildings = {
+    ironMine:0,copperMine:0,lithiumMine:0,
+    foodFarm:1,waterPlant:1,habitat:1,clinic:0,entertainment:0,securityCenter:0,
+    scienceCenter:0,
+    missileBattery:0,laserBattery:0,shipyard:1
+  };
+  planet.upgrades = {
+    foodFarm:0,waterPlant:0,habitat:0,clinic:0,entertainment:0,securityCenter:0,
+    scienceCenter:0
+  };
+  planet.upgradeQueues = {};
+  planet.buildingQueues = {};
+  planet.buildingQueue = null;
+  planet.shipQueue = null;
+  planet.captureState = null;
+
+  ship.consumedForColony = true;
+  destroyShip(ship,null);
+
+  // Владелец планеты изменился — один раз перестраиваем её визуальные метки/ауру.
+  buildPlanets();
+  buildMiniMapDots();
+  PERF.cullingDirty = true;
+  updateWorldCulling(true);
+
+  closePlanetInfo();
+  setResourceBarPlanet(planet);
+
+  pushEvent(
+    'КОЛОНИЯ ОСНОВАНА: «' + planet.name + '». Высажено ' + settlers +
+    ' человек. Колонизационный корабль преобразован в базовый центр и верфь.',
+    'success'
+  );
+  const starterMineCount = mineTypesForPlanet(planet).length;
+  pushEvent(
+    'КОЛОНИАЛЬНЫЙ КОМПЛЕКТ: на складе достаточно ресурсов, чтобы построить по одной добывающей станции для всех ' +
+    starterMineCount + ' месторождений этой планеты.',
+    'resource'
+  );
+  pushEvent(
+    'ИМПЕРСКАЯ ЛОГИСТИКА: ресурсы этой колонии автоматически входят в общий резерв и доступны для строительства на любой вашей планете.',
+    'resource'
+  );
+
+  currentPlanetTab = 'mining';
+  openPlanetFleetMenu(planet);
+}
+
+function closeCargoDelivery(){
+  cargoDeliveryOverlay.classList.remove('open');
+  cargoSourcePlanet = null;
+}
+
+function selectedCargoShip(){
+  return scouts.find(s =>
+    s.id === cargoShipSelect.value &&
+    s.owner === 'player' &&
+    s.type === 'cargo'
+  ) || null;
+}
+
+function selectedCargoDestination(){
+  return planets.find(p => p.id === cargoDestinationSelect.value && p.owner === 'player') || null;
+}
+
+function cargoInputRows(){
+  return [...cargoResourceRows.querySelectorAll('.cargoResourceRow')];
+}
+
+function cargoSelectedAmounts(){
+  const cargo = {};
+  cargoInputRows().forEach(row => {
+    const resource = row.dataset.resource;
+    const input = row.querySelector('.cargoAmountInput');
+    const amount = Math.max(0,Math.floor(Number(input?.value || 0)));
+    if(amount > 0) cargo[resource] = amount;
+  });
+  return cargo;
+}
+
+function updateCargoLoadUi(){
+  const ship = selectedCargoShip();
+  const destination = selectedCargoDestination();
+  const capacity = ship?.cargoCapacity || CARGO_DEFAULT_CAPACITY;
+  const cargo = cargoSelectedAmounts();
+  const total = Object.values(cargo).reduce((a,b)=>a+b,0);
+  const pct = Math.min(100,total/capacity*100);
+  const over = total > capacity;
+
+  cargoCapacityText.textContent = total + ' / ' + capacity;
+  cargoCapacityText.classList.toggle('over',over);
+  cargoCapacityFill.style.width = pct + '%';
+  cargoCapacityFill.classList.toggle('over',over);
+
+  const resourceKinds = Object.keys(cargo).length;
+  if(!destination){
+    cargoRouteSummary.textContent = 'Выберите планету назначения.';
+  }else if(total <= 0){
+    cargoRouteSummary.textContent = 'Выберите количество ресурсов для отправки на «' + destination.name + '».';
+  }else if(over){
+    cargoRouteSummary.textContent = 'Трюм переполнен на ' + (total-capacity) + ' ед. Уменьшите груз.';
+  }else{
+    cargoRouteSummary.textContent =
+      'Маршрут: «' + cargoSourcePlanet.name + '» → «' + destination.name +
+      '» • ' + resourceKinds + ' вид. ресурсов • ' + total + ' ед.';
+  }
+
+  cargoDeliverySend.disabled = !ship || !destination || total <= 0 || over;
+}
+
+function renderCargoResourceRows(){
+  if(!cargoSourcePlanet) return;
+
+  const resources = Object.keys(cargoSourcePlanet.stockpile || {})
+    .filter(r => Math.floor(getStock(cargoSourcePlanet,r)) > 0)
+    .sort((a,b)=>getStock(cargoSourcePlanet,b)-getStock(cargoSourcePlanet,a));
+
+  if(!resources.length){
+    cargoResourceRows.innerHTML = '<div class="cargoEmpty">На этой планете сейчас нет ресурсов для отправки.</div>';
+    updateCargoLoadUi();
+    return;
+  }
+
+  cargoResourceRows.innerHTML = resources.map(resource => {
+    const stock = Math.floor(getStock(cargoSourcePlanet,resource));
+    return `
+      <div class="cargoResourceRow" data-resource="${resource}">
+        <div class="cargoResourceName">
+          ${resourceIconHtml(resource,'sm')}
+          <span>${resource}<small class="cargoResourceStock">На складе: ${stock}</small></span>
+        </div>
+        <input class="cargoAmountInput" type="number" min="0" max="${stock}" step="1" value="0" inputmode="numeric">
+        <button class="cargoMaxBtn" type="button">МАКС</button>
+      </div>
+    `;
+  }).join('');
+
+  cargoInputRows().forEach(row => {
+    const input = row.querySelector('.cargoAmountInput');
+    const maxBtn = row.querySelector('.cargoMaxBtn');
+
+    input.addEventListener('input',()=>{
+      const stock = Math.floor(getStock(cargoSourcePlanet,row.dataset.resource));
+      input.value = String(Math.max(0,Math.min(stock,Math.floor(Number(input.value || 0)))));
+      updateCargoLoadUi();
+    });
+
+    maxBtn.addEventListener('click',()=>{
+      const ship = selectedCargoShip();
+      const capacity = ship?.cargoCapacity || CARGO_DEFAULT_CAPACITY;
+      const currentCargo = cargoSelectedAmounts();
+      const currentForThis = currentCargo[row.dataset.resource] || 0;
+      const usedWithoutThis =
+        Object.values(currentCargo).reduce((a,b)=>a+b,0) - currentForThis;
+      const remaining = Math.max(0,capacity-usedWithoutThis);
+      const stock = Math.floor(getStock(cargoSourcePlanet,row.dataset.resource));
+      input.value = String(Math.min(stock,remaining));
+      updateCargoLoadUi();
+    });
+  });
+
+  updateCargoLoadUi();
+}
+
+function openCargoDelivery(sourcePlanet){
+  if(!sourcePlanet || sourcePlanet.owner !== 'player') return;
+
+  const cargoShips = availableCargoShipsAtPlanet(sourcePlanet);
+  const destinations = playerColonies().filter(p => p !== sourcePlanet);
+
+  if(!cargoShips.length){
+    pushEvent('На орбите «' + sourcePlanet.name + '» нет свободного грузового корабля.', 'discovery');
+    return;
+  }
+  if(!destinations.length){
+    pushEvent('Для доставки ресурсов нужна хотя бы ещё одна ваша колония.', 'discovery');
+    return;
+  }
+
+  cargoSourcePlanet = sourcePlanet;
+  cargoSourceLabel.textContent = 'Отправление с «' + sourcePlanet.name + '»';
+
+  cargoShipSelect.innerHTML = cargoShips.map(ship =>
+    '<option value="' + ship.id + '">' + ship.name + ' • ' +
+    (ship.cargoCapacity || CARGO_DEFAULT_CAPACITY) + ' ед.</option>'
+  ).join('');
+
+  cargoDestinationSelect.innerHTML = destinations.map(p =>
+    '<option value="' + p.id + '">' + p.name + ' • население ' +
+    Math.floor(p.population || 0).toLocaleString('ru-RU') + '</option>'
+  ).join('');
+
+  renderCargoResourceRows();
+  cargoDeliveryOverlay.classList.add('open');
+}
+
+function startCargoDelivery(){
+  if(!cargoSourcePlanet) return;
+
+  const ship = selectedCargoShip();
+  const destination = selectedCargoDestination();
+  if(!ship || !destination || destination === cargoSourcePlanet) return;
+
+  if(ship.orbitPlanet !== cargoSourcePlanet || ship.targetPlanet || ship.resourceTransport){
+    pushEvent('Выбранный грузовой корабль уже занят или покинул орбиту.', 'discovery');
+    closeCargoDelivery();
+    return;
+  }
+
+  const capacity = ship.cargoCapacity || CARGO_DEFAULT_CAPACITY;
+  const cargo = cargoSelectedAmounts();
+  const total = Object.values(cargo).reduce((a,b)=>a+b,0);
+
+  if(total <= 0 || total > capacity) return;
+
+  for(const [resource,amount] of Object.entries(cargo)){
+    if(amount > Math.floor(getStock(cargoSourcePlanet,resource))){
+      pushEvent('На складе уже недостаточно ресурса «' + resource + '».', 'discovery');
+      renderCargoResourceRows();
+      return;
+    }
+  }
+
+  for(const [resource,amount] of Object.entries(cargo)){
+    addStock(cargoSourcePlanet,resource,-amount);
+  }
+
+  ship.resourceTransport = {
+    sourcePlanet:cargoSourcePlanet,
+    targetPlanet:destination,
+    cargo:{...cargo},
+    total,
+    capacity,
+    stage:'toTarget'
+  };
+
+  setScoutTarget(ship,destination,{silent:true,preserveTransport:true});
+  updateSelectedPlanetResourceBar(true);
+
+  pushEvent(
+    ship.name + ' загрузил ' + total + ' ед. ресурсов и отправился: «' +
+    cargoSourcePlanet.name + '» → «' + destination.name + '».',
+    'resource'
+  );
+
+  scoutCommandHint.textContent =
+    ship.name + ': доставка ' + total + ' ед. ресурсов на «' + destination.name + '».';
+  scoutCommandHint.classList.add('show');
+  clearTimeout(startCargoDelivery._timer);
+  startCargoDelivery._timer = setTimeout(()=>scoutCommandHint.classList.remove('show'),3200);
+
+  closeCargoDelivery();
+  closePlanetInfo();
+}
+
+function finishResourceTransportArrival(ship,target){
+  const mission = ship?.resourceTransport;
+  if(!mission) return false;
+
+  let unloadPlanet = null;
+  let message = '';
+
+  if(mission.stage === 'toTarget' && mission.targetPlanet === target){
+    unloadPlanet = target;
+    message =
+      ship.name + ' доставил ' + mission.total + ' ед. ресурсов на «' + target.name + '».';
+  }else if(mission.stage === 'returning' && mission.sourcePlanet === target){
+    unloadPlanet = target;
+    message =
+      ship.name + ' вернулся на «' + target.name + '» и выгрузил перевозимый груз обратно на склад.';
+  }else{
+    return false;
+  }
+
+  for(const [resource,amount] of Object.entries(mission.cargo || {})){
+    addStock(unloadPlanet,resource,amount);
+  }
+
+  ship.resourceTransport = null;
+  pushEvent(message,'success');
+
+  if(resourceBarPlanet === unloadPlanet){
+    updateSelectedPlanetResourceBar(true);
+  }
+
+  if(currentFleetPlanet === unloadPlanet && planetFleetOverlay.classList.contains('open')){
+    renderPlanetMenuTab(unloadPlanet);
+  }
+
+  scoutCommandHint.textContent = message;
+  scoutCommandHint.classList.add('show');
+  clearTimeout(finishResourceTransportArrival._timer);
+  finishResourceTransportArrival._timer =
+    setTimeout(()=>scoutCommandHint.classList.remove('show'),3200);
+
+  return true;
+}
+
+function resumeResourceTransport(ship){
+  const mission = ship?.resourceTransport;
+  if(!mission || ship.destroyed) return false;
+
+  const target = mission.stage === 'returning'
+    ? mission.sourcePlanet
+    : mission.targetPlanet;
+
+  if(!target) return false;
+  setScoutTarget(ship,target,{silent:true,preserveTransport:true});
+  return true;
+}
+
+function ownershipText(planet){
+  if(planet.owner === 'player') return 'Ваша колония';
+  if(planet.owner === 'enemy') return 'Колония противника';
+  return 'Нейтральная';
+}
+
+function habitabilityText(planet){
+  if(planet.owner === 'player' && planet.habitable) return 'Заселена';
+  return planet.habitable
+    ? 'Пригодна для заселения'
+    : 'Колонизация недоступна • возможна автономная добыча';
+}
+
+function fleetAtPlanet(planet){
+  const ownColonies = planet?.owner === 'player' ? planets.filter(p=>p.owner==='player') : [];
+  return scouts.filter(s => {
+    if(!s || s.destroyed) return false;
+    if(s.orbitPlanet === planet && !s.targetPlanet) return true;
+    if(s.owner !== 'player' || planet.owner !== 'player') return false;
+
+    // Патрульные корабли считаются флотом своей колонии даже когда физически
+    // кружат вокруг неё или на короткое время перехватывают цель.
+    if(s.autoPatrolPlanet === planet && !!s.patrolState) return true;
+    if(s.homePlanet === planet && (!!s.patrolState || s.autoPatrolPlanet === planet)) return true;
+
+    // Страховка для старых/переходных состояний: свободный корабль рядом с
+    // собственной колонией относится к ближайшей колонии и не пропадает из списка.
+    const busyElsewhere = !!s.targetPlanet || !!s.targetPoint || !!s.resourceTransport ||
+      !!s.researchMining || !!s.planetMining || !!s._aeAnomalyTargetId || !!s._aeSignalDelivery;
+    if(busyElsewhere || !ownColonies.length) return false;
+    let nearest=null, best=Infinity;
+    for(const p of ownColonies){
+      const d=Math.hypot(s.x-p.x,s.y-p.y);
+      if(d<best){best=d;nearest=p;}
+    }
+    return nearest===planet && best<=235;
+  });
+}
+
+function updatePlanetTravelButton(){
+  const count = infoSelectedShipIds.size;
+  planetTravelBtn.disabled = count === 0;
+  planetTravelBtn.classList.toggle('ready', count > 0);
+  planetTravelBtn.textContent = count > 0
+    ? 'Выбрать для перелёта (' + count + ')'
+    : 'Выбрать корабли для перелёта';
+
+  const canCreate =
+    !!currentInfoPlanet &&
+    currentInfoPlanet.owner === 'player' &&
+    count >= 2;
+
+  planetCreateGroupBtn.disabled = !canCreate;
+  planetCreateGroupBtn.classList.toggle('ready',canCreate);
+  planetCreateGroupBtn.textContent = canCreate
+    ? 'Создать группу (' + count + ')'
+    : 'Создать группу из выбранных';
+}
+
+function openPlanetInfo(planet){
+  if(!gameStarted || !isPlanetDiscovered(planet)) return;
+
+  const known = planet.playerScanned || planet.owner === 'player';
+
+  if(!known && planet.owner !== 'player'){
+    scoutCommandHint.textContent =
+      'Планета обнаружена, но ещё не изучена полностью.';
+    scoutCommandHint.classList.add('show');
+    setTimeout(() => scoutCommandHint.classList.remove('show'), 2200);
+    return;
+  }
+
+  currentInfoPlanet = planet;
+  infoSelectedShipIds = new Set();
+
+  if(planet.owner === 'player'){
+    setResourceBarPlanet(planet);
+  }
+  // Защита от "сквозного" тапа на телефоне:
+  // окно планеты открывается по pointerdown, а синтетический click того же касания
+  // может прийти уже по появившейся строке флота. Временная блокировка — запасной слой;
+  // ниже каждая строка флота дополнительно требует собственный новый pointerdown.
+  fleetSelectionUnlockAt = performance.now() + 850;
+
+  planetInfoTitle.textContent = planet.name;
+  planetInfoSubtitle.textContent =
+    planet.isRare
+      ? 'Редкая планета'
+      : (planet.owner === 'player'
+          ? (planet === playerPlanet ? 'Стартовая колония' : 'Колония игрока')
+          : 'Исследованная планета');
+
+  planetInfoHabitability.textContent = habitabilityText(planet);
+  planetInfoOwnership.textContent = ownershipText(planet);
+
+  if(planet.owner === 'player'){
+    planetInfoHint.hidden = false;
+    planetInfoHintText.innerHTML = '<b>Что делать в первую очередь:</b> откройте <b>«Управление планетой»</b> и сначала постройте добычу железа, затем меди и лития. После этого развивайте <b>население</b> (еда и вода повышают настроение и рост), стройте <b>Научный центр</b> для ускорения исследований и переходите к флоту. Логика развития простая: <b>ресурсы → население и наука → флот → новые колонии</b>.';
+  }else if(!planet.habitable){
+    planetInfoHint.hidden = false;
+    const remoteLeft = Math.floor(planetExtractionRemaining(planet));
+    planetInfoHintText.innerHTML = '<b>Удалённая разработка:</b> эту планету нельзя колонизировать. Её суммарный первоначальный запас — <b>10 000 ед. ресурсов</b>, распределённых между местными залежами. Отправьте сюда <b>«Грузовой корабль»</b>: он загрузит ресурсы, отвезёт их в общий имперский запас и автоматически вернётся за следующей партией. Одновременно могут работать до <b>2 грузовых кораблей</b>.<br><b>Осталось сейчас: '+remoteLeft.toLocaleString('ru-RU')+' ед.</b> Если корабль прилетит после полного истощения, он останется на орбите и будет ждать приказа.';
+  }else{
+    planetInfoHint.hidden = true;
+    planetInfoHintText.textContent = '';
+  }
+
+  planetInfoResources.innerHTML = '';
+  const extractionReserves = (!planet.habitable && planet.owner === 'neutral')
+    ? ensurePlanetExtractionReserves(planet)
+    : null;
+  planet.resources.forEach(resource => {
+    const chip = document.createElement('span');
+    chip.className = 'infoResourceChip';
+    chip.textContent = extractionReserves
+      ? resource + ' • запас ' + Math.floor(extractionReserves[resource] || 0)
+      : resource;
+    planetInfoResources.appendChild(chip);
+  });
+
+  const localFleet = fleetAtPlanet(planet);
+  const groupableLocalShips = localFleet.filter(ship =>
+    ship.owner === 'player' &&
+    !ship.scanState &&
+    !ship.cooldownState &&
+    !ship.targetPlanet &&
+    !ship.resourceTransport &&
+    !ship.combatTarget
+  );
+  planetCreateGroupBtn.hidden = planet.owner !== 'player' || groupableLocalShips.length < 2;
+  planetInfoFleet.innerHTML = '';
+
+  if(localFleet.length === 0){
+    const row = document.createElement('div');
+    row.className = 'infoFleetRow';
+    row.innerHTML =
+      '<span>Флот отсутствует</span><span class="infoFleetStatus">Орбита свободна</span>';
+    planetInfoFleet.appendChild(row);
+  }else{
+    localFleet.forEach(ship => {
+      const row = document.createElement('div');
+      const canSelect =
+        ship.owner === 'player' &&
+        !ship.scanState &&
+        !ship.cooldownState &&
+        !ship.targetPlanet &&
+        !ship.resourceTransport &&
+        !ship.combatTarget;
+      row.className = 'infoFleetRow' + (canSelect ? ' selectable' : '');
+
+      const ownerText = ship.owner === 'player' ? 'Ваш' : 'Противник';
+      let status = 'На орбите';
+      if(ship.scanState) status = 'Сканирование: ' + Math.ceil(ship.scanState.remaining) + ' сек.';
+      else if(ship.cooldownState) status = 'Заряд батарей: ' + Math.ceil(ship.cooldownState.remaining) + ' сек.';
+      else if(ship.autoPatrolPlanet === planet && ship.patrolState) status = ship.combatTarget ? 'Автопатруль • перехват' : 'Автопатруль • охраняет планету';
+      else if(ship.planetMining) status = shipStatusText(ship);
+
+      const main = document.createElement('div');
+      main.className = 'infoFleetMain';
+
+      if(canSelect){
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        check.className = 'infoFleetCheck';
+        check.dataset.shipId = ship.id;
+        main.appendChild(check);
+      }
+
+      const name = document.createElement('span');
+      name.className = 'infoFleetName';
+      const group = fleetGroupForShip(ship);
+      name.innerHTML =
+        renderTinyShipIcon(ship.type,'xs') +
+        '<span>' + ship.name + ' • ' + ownerText +
+        (group ? '<span class="fleetGroupMiniTag">' + fleetGroupLabel(group) + '</span>' : '') +
+        '</span>';
+      main.appendChild(name);
+
+      const statusEl = document.createElement('span');
+      statusEl.className = 'infoFleetStatus';
+      statusEl.textContent = status;
+
+      row.appendChild(main);
+      row.appendChild(statusEl);
+      planetInfoFleet.appendChild(row);
+
+      if(canSelect){
+        const check = row.querySelector('.infoFleetCheck');
+
+        // Корабль можно выбрать только новым отдельным касанием по его строке.
+        // Если окно планеты появилось под уже зажатым пальцем, последующий click
+        // не имеет собственного pointerdown на этой строке и будет проигнорирован.
+        row._fleetSelectionArmed = false;
+
+        row.addEventListener('pointerdown', e => {
+          if(performance.now() < fleetSelectionUnlockAt){
+            row._fleetSelectionArmed = false;
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+          row._fleetSelectionArmed = true;
+          e.stopPropagation();
+        }, {passive:false});
+
+        row.addEventListener('pointercancel', () => {
+          row._fleetSelectionArmed = false;
+        });
+
+        row.addEventListener('click', e => {
+          if(
+            performance.now() < fleetSelectionUnlockAt ||
+            !row._fleetSelectionArmed
+          ){
+            row._fleetSelectionArmed = false;
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+
+          row._fleetSelectionArmed = false;
+
+          if(e.target !== check) check.checked = !check.checked;
+
+          if(check.checked) infoSelectedShipIds.add(ship.id);
+          else infoSelectedShipIds.delete(ship.id);
+
+          row.classList.toggle('selected', check.checked);
+          updatePlanetTravelButton();
+        });
+      }
+    });
+  }
+
+  refreshPlanetSpecialActions(planet,localFleet);
+
+  if(planet.owner === 'player'){
+    planetManageBtn.disabled = false;
+    planetManageBtn.textContent = 'Управление планетой';
+    if(gameSettings.actionHighlight) planetManageBtn.classList.add('manage-highlight');
+    else planetManageBtn.classList.remove('manage-highlight');
+  }else{
+    planetManageBtn.disabled = true;
+    planetManageBtn.textContent =
+      planet.habitable
+        ? 'Сначала основать колонию'
+        : 'Сначала получить контроль';
+    planetManageBtn.classList.remove('manage-highlight');
+  }
+
+  updatePlanetTravelButton();
+  planetInfoOverlay.classList.add('open');
+
+  if(
+    !firstColonizablePlanetTutorialShown &&
+    gameSettings.hints &&
+    planet.owner === 'neutral' &&
+    planet.playerScanned &&
+    planet.habitable
+  ){
+    firstColonizablePlanetTutorialShown = true;
+    showContextTutorial(
+      '🌍',
+      'Эту планету можно колонизировать',
+      'Постройте на одной из своих колоний <b>«Колонизационный корабль»</b>, посадите на него колонистов и отправьте к такой планете. Когда корабль окажется на орбите, в карточке появится кнопка <b>«Колонизировать»</b>. После основания колонии её добыча сразу подключится к <b>общему имперскому резерву</b>.'
+    );
+  }
+}
+
+function closePlanetInfo(){
+  planetInfoOverlay.classList.remove('open');
+  currentInfoPlanet = null;
+  infoSelectedShipIds = new Set();
+  planetInfoHint.hidden = true;
+  planetInfoHintText.textContent = '';
+  planetManageBtn.classList.remove('manage-highlight');
+  planetColonizeBtn.hidden = true;
+  planetCargoBtn.hidden = true;
+  planetCreateGroupBtn.hidden = true;
+}
+
+planetInfoClose.addEventListener('click', closePlanetInfo);
+planetInfoCloseBottom.addEventListener('click', closePlanetInfo);
+
+planetColonizeBtn.addEventListener('click', () => {
+  if(!currentInfoPlanet) return;
+  colonizePlayerPlanet(currentInfoPlanet);
+});
+
+planetCargoBtn.addEventListener('click', () => {
+  if(!currentInfoPlanet || currentInfoPlanet.owner !== 'player') return;
+  openCargoDelivery(currentInfoPlanet);
+});
+
+cargoDeliveryClose.addEventListener('click',closeCargoDelivery);
+cargoDeliveryCancel.addEventListener('click',closeCargoDelivery);
+cargoDeliveryOverlay.addEventListener('pointerdown',e=>{
+  if(e.target === cargoDeliveryOverlay) closeCargoDelivery();
+  else e.stopPropagation();
+});
+cargoShipSelect.addEventListener('change',()=>{
+  renderCargoResourceRows();
+});
+cargoDestinationSelect.addEventListener('change',updateCargoLoadUi);
+cargoDeliverySend.addEventListener('click',startCargoDelivery);
+
+planetCreateGroupBtn.addEventListener('click',createFleetGroupFromPlanetSelection);
+
+planetTravelBtn.addEventListener('click', () => {
+  if(!currentInfoPlanet || infoSelectedShipIds.size === 0) return;
+
+  const ships = scouts.filter(s => infoSelectedShipIds.has(s.id));
+  if(!ships.length) return;
+
+  chooseFleetForTravel(ships);
+  closePlanetInfo();
+});
+
+
+planetInfoOverlay.addEventListener('pointerdown', e => {
+  if(e.target === planetInfoOverlay){
+    closePlanetInfo();
+    return;
+  }
+  e.stopPropagation();
+});
+
+planetManageBtn.addEventListener('click', () => {
+  if(!currentInfoPlanet || currentInfoPlanet.owner !== 'player') return;
+
+  const planet = currentInfoPlanet;
+  closePlanetInfo();
+
+  // Полное управление — отдельное окно.
+  currentPlanetTab = 'mining';
+  openPlanetFleetMenu(planet);
+  bindResearchButtons();
+});
+
+
+
+function bindResearchButtons(planet=currentFleetPlanet){
+  planetMenuContent.querySelectorAll('.startTechBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      startTechnology(btn.dataset.name,Number(btn.dataset.level),Number(btn.dataset.cost));
+    });
+  });
+
+  planetMenuContent.querySelectorAll('.cancelTechBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      cancelTechnology();
+    });
+  });
+
+  if(!planet) return;
+
+  planetMenuContent.querySelectorAll('.buildBuildingBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      startBuilding(planet,btn.dataset.building);
+    });
+  });
+
+  planetMenuContent.querySelectorAll('.cancelBuildingBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      cancelBuilding(planet,btn.dataset.building);
+    });
+  });
+
+  planetMenuContent.querySelectorAll('.startInfraUpgradeBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      startInfrastructureUpgrade(planet,btn.dataset.upgrade);
+    });
+  });
+
+  planetMenuContent.querySelectorAll('.cancelInfraUpgradeBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      cancelInfrastructureUpgrade(planet,btn.dataset.upgrade);
+    });
+  });
+}
+
+
+function formatCivilizationRequirementValue(req){
+  if(req.label === 'Население'){
+    return Math.floor(req.current).toLocaleString('ru-RU') +
+      ' / ' + Math.floor(req.target).toLocaleString('ru-RU');
+  }
+  return req.current + (req.unit || '') + ' / ' + req.target + (req.unit || '');
+}
+
+function renderCivilizationTab(planet){
+  const level = getCivilizationLevel(planet);
+  const info = civilizationInfo(level);
+  const nextLevel = level < CIVILIZATION_LEVELS.length ? level + 1 : null;
+  const nextInfo = nextLevel ? civilizationInfo(nextLevel) : null;
+  const requirements = nextLevel ? civilizationRequirements(planet,nextLevel) : [];
+  const completeCount = requirements.filter(r => r.met).length;
+  const progress = requirements.length
+    ? Math.round((completeCount / requirements.length) * 100)
+    : 100;
+
+  planetMenuContent.innerHTML = `
+    <div class="civilizationHero civ-level-${level}">
+      <div class="civilizationHeroGlow"></div>
+      <div class="civilizationLevelIcon">${info.icon}</div>
+      <div class="civilizationHeroText">
+        <div class="civilizationKicker">УРОВЕНЬ ЦИВИЛИЗАЦИИ ${level}</div>
+        <div class="civilizationName">${info.name}</div>
+        <div class="civilizationDesc">${info.desc}</div>
+      </div>
+      <div class="civilizationBigLevel">${level}</div>
+    </div>
+
+    <div class="planetMenuGroup theme-civilization">
+      <div class="planetMenuGroupTitle">Действующие бонусы</div>
+      <div class="civilizationBonusGrid">
+        <div class="civilizationBonus">
+          <span>⛏</span>
+          <div>
+            <b>Добыча</b>
+            <small>${info.productionBonus ? '+' + Math.round(info.productionBonus*100) + '%' : 'Без бонуса'}</small>
+          </div>
+        </div>
+        <div class="civilizationBonus">
+          <span>🔬</span>
+          <div>
+            <b>Исследования</b>
+            <small>${info.scienceBonus ? '+' + Math.round(info.scienceBonus*100) + '%' : 'Без бонуса'}</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    ${nextLevel ? `
+      <div class="planetMenuGroup theme-civilization-progress">
+        <div class="planetMenuGroupTitle">Следующий уровень — ${nextLevel}. ${nextInfo.name}</div>
+
+        <div class="civilizationProgressTop">
+          <span>Выполнено требований: ${completeCount} / ${requirements.length}</span>
+          <b>${progress}%</b>
+        </div>
+        <div class="civilizationProgressTrack">
+          <span style="width:${progress}%"></span>
+        </div>
+
+        <div class="civilizationRequirements">
+          ${requirements.map(req => `
+            <div class="civilizationRequirement ${req.met ? 'met' : ''}">
+              <span class="civilizationReqState">${req.met ? '✓' : '○'}</span>
+              <span class="civilizationReqName">${req.label}</span>
+              <b>${formatCivilizationRequirementValue(req)}</b>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="civilizationNextUnlocks">
+          <div class="civilizationNextTitle">После достижения уровня откроется:</div>
+          <div class="civilizationUnlockChips">
+            ${nextInfo.unlocks.map(x => `<span>${x}</span>`).join('')}
+          </div>
+        </div>
+
+        <div class="civilizationAutoNote">
+          Уровень повышается автоматически, как только выполнены все требования.
+        </div>
+      </div>
+    ` : `
+      <div class="planetMenuGroup theme-civilization-progress">
+        <div class="civilizationMaxLevel">
+          ★ Эта планета достигла максимального уровня цивилизации.
+        </div>
+      </div>
+    `}
+
+    <div class="planetMenuGroup theme-civilization-roadmap">
+      <div class="planetMenuGroupTitle">Путь развития</div>
+      <div class="civilizationRoadmap">
+        ${CIVILIZATION_LEVELS.map(stage => {
+          const state = stage.level < level ? 'done' : (stage.level === level ? 'current' : 'locked');
+          return `
+            <div class="civilizationStage ${state}">
+              <div class="civilizationStageLevel">${stage.icon}<b>${stage.level}</b></div>
+              <div class="civilizationStageBody">
+                <div class="civilizationStageName">${stage.name}</div>
+                <div class="civilizationStageUnlocks">${stage.unlocks.join(' • ')}</div>
+              </div>
+              <div class="civilizationStageState">
+                ${state === 'done' ? '✓' : state === 'current' ? 'ТЕКУЩИЙ' : '🔒'}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderDefenseTab(planet){
+  const missile = planet.buildings.missileBattery || 0;
+  const laser = planet.buildings.laserBattery || 0;
+  const activeDefense = missile + laser;
+
+  planetMenuContent.innerHTML = `
+    <div class="planetMenuGroup theme-defense-main">
+      <div class="planetMenuGroupTitle">Планетарная оборона</div>
+      <div class="defenseStatus">
+        <div>
+          <div class="defenseTitle">Активные установки</div>
+          <div class="facilityDesc">Ракетные: ${missile} • Лазерные: ${laser}</div>
+        </div>
+        <div class="defenseValue">${activeDefense ? 'Оборона активна' : 'Нет обороны'}</div>
+      </div>
+      ${buildingCardHtml(planet,'missileBattery')}
+      ${buildingCardHtml(planet,'laserBattery')}
+    </div>
+
+    <div class="planetMenuGroup theme-defense-capture">
+      <div class="planetMenuGroupTitle">Захват планеты</div>
+      <div class="captureWarning">
+        Если вражеский флот уничтожит всю планетарную оборону, начинается захват на <b>3 минуты</b>.
+        В течение этого времени планету можно отбить. Население постепенно уменьшается.
+        Если таймер закончится, все постройки уничтожаются и планета переходит противнику.
+      </div>
+      ${planet.captureState ? `<div class="queueText">Захват: ${Math.ceil(planet.captureState.remaining)} сек.</div><div class="queueBar"><div class="queueFill" style="width:${(1-planet.captureState.remaining/180)*100}%"></div></div>` : ''}
+    </div>
+  `;
+
+  planetMenuContent.querySelectorAll('.buildBuildingBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      startBuilding(planet,btn.dataset.building);
+    });
+  });
+  planetMenuContent.querySelectorAll('.cancelBuildingBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelBuilding(planet,btn.dataset.building);
+    });
+  });
+}
+
+function renderPlanetMenuTab(planet){
+  planetMenuTabs.querySelectorAll('.planetTab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === currentPlanetTab);
+  });
+
+  if(currentPlanetTab === 'mining') renderMiningTab(planet);
+  else if(currentPlanetTab === 'fleet') renderFleetTab(planet);
+  else if(currentPlanetTab === 'population') renderPopulationTab(planet);
+  else if(currentPlanetTab === 'research') renderResearchTab(planet);
+  else if(currentPlanetTab === 'defense') renderDefenseTab(planet);
+  else renderCivilizationTab(planet);
+
+  injectPlanetTabHelper(planet);
+}
+
+planetMenuTabs.addEventListener('click', e => {
+  const btn = e.target.closest('.planetTab');
+  if(!btn || !currentFleetPlanet) return;
+  currentPlanetTab = btn.dataset.tab;
+  renderPlanetMenuTab(currentFleetPlanet);
+});
+
+function openPlanetFleetMenu(planet){
+  if(!gameStarted || !isPlanetDiscovered(planet)) return;
+  if(planet.owner !== 'player') return;
+
+  currentFleetPlanet = planet;
+  setResourceBarPlanet(planet);
+
+  const known = planet.playerScanned || planet.owner === 'player' || planet.owner === 'enemy';
+  planetFleetTitle.textContent = known ? 'Управление: ' + planet.name : 'Управление планетой';
+
+  if(known){
+    planetFleetResources.innerHTML = planetHeaderSummaryHtml(planet, true);
+  }else{
+    planetFleetResources.innerHTML = planetHeaderSummaryHtml(planet, false);
+  }
+
+  renderPlanetMenuTab(planet);
+  planetFleetOverlay.classList.add('open');
+}
+
+function closePlanetFleetMenu(){
+  planetFleetOverlay.classList.remove('open');
+  currentFleetPlanet = null;
+}
+
+planetFleetClose.addEventListener('click', closePlanetFleetMenu);
+planetFleetOverlay.addEventListener('pointerdown', e => {
+  planetMenuInteractionAt = performance.now();
+  if(e.target === planetFleetOverlay) closePlanetFleetMenu();
+}, {capture:true});
+
+function revealAlongScout(scout){
+  if(scout.owner !== 'player') return;
+  const d = Math.hypot(scout.x-scout.lastRevealX,scout.y-scout.lastRevealY);
+  if(d >= 88){
+    exploredAreas.push({x:scout.x,y:scout.y,r:150});
+    scout.lastRevealX = scout.x;
+    scout.lastRevealY = scout.y;
+    drawFog();
+  }
+}
+
+
+function shipDistance(a,b){
+  return Math.hypot(a.x-b.x,a.y-b.y);
+}
+
+function findNearestEnemy(ship, radius){
+  let best = null;
+  let bestD = Infinity;
+  for(const other of scouts){
+    if(other === ship || other.destroyed || other.owner === ship.owner) continue;
+    const d = shipDistance(ship,other);
+    if(d <= radius && d < bestD){
+      best = other;
+      bestD = d;
+    }
+  }
+  return best;
+}
+
+function patrolLeashRadius(patrol){
+  if(!patrol) return 0;
+  return patrol.chaseRadius || Math.max((patrol.radius || 175) + 110, (patrol.radius || 175) * 1.65);
+}
+
+function markPatrolReturn(ship,reason=''){
+  const patrol = ship?.patrolState;
+  if(!patrol) return false;
+  ship.combatTarget = null;
+  ship.attackAlerted = false;
+  patrol.returning = true;
+  patrol.chasing = false;
+  patrol.chaseTargetId = null;
+  patrol.detectionCooldown = Math.max(patrol.detectionCooldown || 0, 1.4);
+  ensurePatrolVisual(ship);
+  if(reason && ship.owner === 'player'){
+    const now = gameElapsed || 0;
+    if(!patrol.lastReturnNotice || now - patrol.lastReturnNotice > 4){
+      patrol.lastReturnNotice = now;
+      pushEvent(reason,'discovery');
+    }
+  }
+  return true;
+}
+
+function beginCombat(attacker,target,fromPatrol=false){
+  if(!attacker || !target || attacker.destroyed || target.destroyed) return;
+  attacker.combatTarget = target;
+  attacker.targetPlanet = null;
+  attacker.orbitPlanet = null;
+  attacker.researchMining = null;
+  attacker.stationary = false;
+
+  if(fromPatrol && attacker.patrolState){
+    attacker.patrolState.returning = false;
+    attacker.patrolState.chasing = true;
+    attacker.patrolState.chaseTargetId = target.id;
+  }
+
+  if(fromPatrol && attacker.owner === 'player'){
+    pushEvent(
+      'ОБНАРУЖЕНИЕ: ' + attacker.name + ' заметил вражеский корабль «' + target.name + '» в зоне патруля.',
+      'detection'
+    );
+  }
+}
+
+
+/* ===== Визуальные боевые эффекты ===== */
+function combatFxLayer(){
+  return document.getElementById('combatFxLayer');
+}
+function combatFxMode(){
+  if(document.body.classList.contains('power-saver') || document.body.classList.contains('effects-minimal')) return 'minimal';
+  if(document.body.classList.contains('effects-max')) return 'max';
+  return 'normal';
+}
+function combatWeaponStyle(ship){
+  const type = ship?.type || '';
+  if(['cruiser','battleship','dreadnought','titan'].includes(type)) return 'laser';
+  if(['destroyer'].includes(type)) return 'rocket';
+  if(['corvette','frigate','guardian'].includes(type)) return 'plasma';
+  return 'pulse';
+}
+function combatHeavyShip(ship){
+  return ['battleship','dreadnought','titan'].includes(ship?.type);
+}
+function fxOwnerClass(ship){
+  return ship?.owner === 'enemy' ? 'enemy' : 'player';
+}
+function removeFxAfter(el,ms){
+  if(!el) return;
+  window.setTimeout(()=>el.remove(),ms);
+}
+function spawnCombatMuzzle(ship,angleDeg){
+  const layer = combatFxLayer();
+  if(!layer || combatFxMode()==='minimal') return;
+  const el=document.createElement('div');
+  el.className='combatFx combatMuzzle '+fxOwnerClass(ship);
+  const rad=angleDeg*Math.PI/180;
+  const offset=combatHeavyShip(ship)?12:8;
+  el.style.left=(ship.x+Math.cos(rad)*offset)+'px';
+  el.style.top=(ship.y+Math.sin(rad)*offset)+'px';
+  layer.appendChild(el);
+  removeFxAfter(el,220);
+}
+function spawnCombatImpact(target,sourceShip,heavy=false){
+  const layer=combatFxLayer();
+  if(!layer || !target || target.destroyed) return;
+  const el=document.createElement('div');
+  el.className='combatFx combatImpact '+fxOwnerClass(sourceShip)+(heavy?' heavy':'');
+  el.style.left=target.x+'px';
+  el.style.top=target.y+'px';
+  layer.appendChild(el);
+  removeFxAfter(el,380);
+}
+function spawnCombatLaser(attacker,target,heavy=false){
+  const layer=combatFxLayer();
+  if(!layer) return;
+  const dx=target.x-attacker.x, dy=target.y-attacker.y;
+  const dist=Math.hypot(dx,dy);
+  const ang=Math.atan2(dy,dx)*180/Math.PI;
+  const el=document.createElement('div');
+  el.className='combatFx combatLaser '+fxOwnerClass(attacker)+(heavy?' heavy':'');
+  el.style.left=attacker.x+'px';
+  el.style.top=attacker.y+'px';
+  el.style.width=Math.max(4,dist)+'px';
+  el.style.transform='translateY(-50%) rotate('+ang+'deg)';
+  layer.appendChild(el);
+  spawnCombatMuzzle(attacker,ang);
+  const impactDelay=combatFxMode()==='minimal'?45:90;
+  window.setTimeout(()=>spawnCombatImpact(target,attacker,heavy),impactDelay);
+  removeFxAfter(el,260);
+}
+function spawnCombatBolt(attacker,target,kind='pulse'){
+  const layer=combatFxLayer();
+  if(!layer) return;
+  const sx=attacker.x, sy=attacker.y, tx=target.x, ty=target.y;
+  const dx=tx-sx,dy=ty-sy,dist=Math.hypot(dx,dy);
+  const ang=Math.atan2(dy,dx)*180/Math.PI;
+  const el=document.createElement('div');
+  el.className='combatFx combatBolt '+fxOwnerClass(attacker)+' '+kind;
+  el.style.left=sx+'px';
+  el.style.top=sy+'px';
+  el.style.transform='translate(-50%,-50%) rotate('+ang+'deg)';
+  layer.appendChild(el);
+  spawnCombatMuzzle(attacker,ang);
+  const mode=combatFxMode();
+  let duration=kind==='rocket'?210:(kind==='plasma'?155:115);
+  if(mode==='minimal') duration=Math.max(70,duration*.62);
+  const anim=el.animate(
+    [
+      {left:sx+'px',top:sy+'px',opacity:1},
+      {left:tx+'px',top:ty+'px',opacity:.95}
+    ],
+    {duration,easing:kind==='rocket'?'cubic-bezier(.18,.68,.28,1)':'linear',fill:'forwards'}
+  );
+  const done=()=>{
+    spawnCombatImpact(target,attacker,kind==='rocket');
+    el.remove();
+  };
+  if(anim?.finished) anim.finished.then(done).catch(()=>el.remove());
+  else window.setTimeout(done,duration);
+}
+function spawnCombatShot(attacker,target){
+  if(!attacker || !target || attacker.destroyed || target.destroyed) return;
+  // Бои за пределами экрана продолжают считаться, но не создают невидимые DOM-анимации.
+  if(typeof isWorldPointNearViewport==='function' &&
+     !isWorldPointNearViewport(attacker.x,attacker.y,180) &&
+     !isWorldPointNearViewport(target.x,target.y,180)) return;
+  const layer=combatFxLayer();
+  const mode=combatFxMode();
+  const cap=mode==='max'?150:(mode==='minimal'?45:95);
+  if(layer && layer.childElementCount>=cap) return;
+  const style=combatWeaponStyle(attacker);
+  if(style==='laser') spawnCombatLaser(attacker,target,combatHeavyShip(attacker));
+  else if(style==='rocket') spawnCombatBolt(attacker,target,'rocket');
+  else if(style==='plasma') spawnCombatBolt(attacker,target,'plasma');
+  else spawnCombatBolt(attacker,target,'pulse');
+}
+function spawnCombatExplosion(ship){
+  const layer=combatFxLayer();
+  if(!layer || !ship) return;
+  if(typeof isWorldPointNearViewport==='function' && !isWorldPointNearViewport(ship.x,ship.y,220)) return;
+  const heavy=combatHeavyShip(ship);
+  const mode=combatFxMode();
+
+  const core=document.createElement('div');
+  core.className='combatFx combatExplosion'+(heavy?' heavy':'');
+  core.style.left=ship.x+'px';
+  core.style.top=ship.y+'px';
+  layer.appendChild(core);
+  removeFxAfter(core,760);
+
+  if(mode!=='minimal'){
+    const ring=document.createElement('div');
+    ring.className='combatFx combatExplosionRing'+(heavy?' heavy':'');
+    ring.style.left=ship.x+'px';
+    ring.style.top=ship.y+'px';
+    layer.appendChild(ring);
+    removeFxAfter(ring,820);
+  }
+
+  if(mode!=='minimal'){
+    const count=mode==='max'?(heavy?13:9):(heavy?8:5);
+    for(let i=0;i<count;i++){
+      const d=document.createElement('div');
+      d.className='combatFx combatDebris';
+      d.style.left=ship.x+'px';
+      d.style.top=ship.y+'px';
+      const a=Math.random()*Math.PI*2;
+      const r=(heavy?28:19)*(0.55+Math.random()*.9);
+      d.style.setProperty('--dx',(Math.cos(a)*r).toFixed(1)+'px');
+      d.style.setProperty('--dy',(Math.sin(a)*r).toFixed(1)+'px');
+      layer.appendChild(d);
+      removeFxAfter(d,820);
+    }
+  }
+}
+
+function damageShip(target,amount,attacker){
+  if(!target || target.destroyed) return;
+  if(attacker?.owner === 'enemy') amount *= getAIProfile().combat;
+  target.hp = Math.max(0,(target.hp ?? target.maxHp ?? 25)-amount);
+
+  if(target.owner === 'player'){
+    if(!target.attackAlerted){
+      target.attackAlerted = true;
+      pushEvent(
+        'ТРЕВОГА: «' + target.name + '» атакован кораблём «' + attacker.name + '».',
+        'attack'
+      );
+    }
+  }
+
+  if(target.hp <= 0){
+    destroyShip(target,attacker);
+  }
+}
+
+function destroyShip(ship,killer){
+  if(!ship || ship.destroyed) return;
+
+  if(ship.owner === 'player' && ship.resourceTransport?.total > 0){
+    pushEvent(
+      'ПОТЕРЯ ГРУЗА: вместе с «' + ship.name + '» потеряно ' +
+      ship.resourceTransport.total + ' ед. перевозимых ресурсов.',
+      'attack'
+    );
+  }
+
+  spawnCombatExplosion(ship);
+  ship.destroyed = true;
+  removeShipFromFleetGroups(ship.id);
+
+  if(ship.targetPlanet?.id && ship.owner === 'enemy'){
+    enemyReservedPlanetIds.delete(ship.targetPlanet.id);
+  }
+
+  removePatrolVisual(ship);
+  ship.el?.remove();
+  ship.timerEl?.remove();
+
+  const index = scouts.indexOf(ship);
+  if(index >= 0) scouts.splice(index,1);
+
+  scouts.forEach(s => {
+    if(s.combatTarget === ship){
+      s.combatTarget = null;
+      s.attackAlerted = false;
+      if(s.patrolState){
+        s.patrolState.returning = true;
+        s.patrolState.chasing = false;
+        s.patrolState.chaseTargetId = null;
+        ensurePatrolVisual(s);
+      }
+    }
+  });
+
+  if(ship.owner === 'player' && !ship.consumedForColony){
+    pushEvent('ПОТЕРЯ: корабль «' + ship.name + '» уничтожен.', 'attack');
+  }else if(killer?.owner === 'player'){
+    pushEvent('Вражеский корабль «' + ship.name + '» уничтожен.', 'success');
+  }
+}
+
+function updateCombat(ship,dtGame){
+  const target = ship.combatTarget;
+  if(!target || target.destroyed){
+    ship.combatTarget = null;
+    ship.attackAlerted = false;
+    if(ship.patrolState){
+      markPatrolReturn(ship);
+    }else if(ship.resourceTransport){
+      resumeResourceTransport(ship);
+    }
+    return;
+  }
+
+  // Корабль, поднятый по тревоге с патруля, не должен преследовать цель через всю карту.
+  // Если цель покинула допустимую область преследования, корабль разрывает контакт и
+  // физически возвращается в свою патрульную зону.
+  if(ship.patrolState){
+    const patrol = ship.patrolState;
+    const leash = patrolLeashRadius(patrol);
+    const targetFromCenter = Math.hypot(target.x-patrol.cx,target.y-patrol.cy);
+    const shipFromCenter = Math.hypot(ship.x-patrol.cx,ship.y-patrol.cy);
+    if(targetFromCenter > leash || shipFromCenter > leash + 45){
+      const targetName = target.name || 'цель';
+      markPatrolReturn(
+        ship,
+        'ПАТРУЛЬ: «' + targetName + '» ушёл слишком далеко. «' + ship.name + '» прекращает погоню и возвращается в свою зону.'
+      );
+      return;
+    }
+  }
+
+  // Разведчики, грузовые, колонизационные, добывающие и ремонтные суда не являются
+  // боевыми единицами: они могут быть атакованы, но не ведут встречный огонь.
+  if(!isMilitaryShipType(ship.type)){
+    ship.combatTarget = null;
+    ship.attackAlerted = false;
+    if(ship.patrolState) markPatrolReturn(ship);
+    return;
+  }
+
+  const dx = target.x-ship.x;
+  const dy = target.y-ship.y;
+  const dist = Math.hypot(dx,dy);
+
+  // Даже если корабль уже находится в радиусе стрельбы и больше не двигается,
+  // он должен смотреть носом на текущую боевую цель.
+  if(dist > .001){
+    ship._headingDeg = Math.atan2(dy,dx) * 180 / Math.PI;
+  }
+
+  if(dist > ship.attackRange){
+    const step = shipMoveSpeed(ship) * 1.15 * dtGame;
+    if(dist > .001){
+      ship.x += dx/dist*Math.min(step,dist);
+      ship.y += dy/dist*Math.min(step,dist);
+    }
+    return;
+  }
+
+  ship.attackCooldown = Math.max(0,(ship.attackCooldown || 0)-dtGame);
+  if(ship.attackCooldown <= 0){
+    ship.attackCooldown = ship.attackInterval || 1.5;
+    const shotDamage = Number.isFinite(ship.damage) ? ship.damage : 2;
+    if(shotDamage > 0){
+      spawnCombatShot(ship,target);
+      damageShip(target,shotDamage,ship);
+    }
+
+    // Только настоящий военный корабль отвечает огнём. Поэтому разведчик или транспорт,
+    // уничтоженный перехватчиком, больше не успевает "забрать его с собой" ответным залпом.
+    if(!target.destroyed && !target.combatTarget && isMilitaryShipType(target.type)){
+      target.combatTarget = ship;
+      target.targetPlanet = null;
+      target.orbitPlanet = null;
+      target.researchMining = null;
+      target.stationary = false;
+    }
+  }
+}
+
+function updatePatrol(ship,dtGame){
+  const patrol = ship.patrolState;
+  if(!patrol) return;
+
+  if(ship.combatTarget){
+    updateCombat(ship,dtGame);
+    return;
+  }
+
+  // После погони корабль не телепортируется обратно на орбиту патруля, а реально летит назад.
+  if(patrol.returning){
+    const relX = ship.x-patrol.cx;
+    const relY = (ship.y-patrol.cy)/.70;
+    const rejoinAngle = Math.abs(relX)+Math.abs(relY) > .001 ? Math.atan2(relY,relX) : (patrol.angle || 0);
+    const tx = patrol.cx + Math.cos(rejoinAngle)*patrol.orbitRadius;
+    const ty = patrol.cy + Math.sin(rejoinAngle)*patrol.orbitRadius*.70;
+    const dx = tx-ship.x, dy = ty-ship.y;
+    const dist = Math.hypot(dx,dy);
+    const step = shipMoveSpeed(ship) * dtGame;
+    if(dist <= Math.max(step,3)){
+      ship.x = tx; ship.y = ty;
+      patrol.angle = rejoinAngle;
+      patrol.returning = false;
+      patrol.chasing = false;
+      patrol.chaseTargetId = null;
+      patrol.detectionCooldown = Math.max(patrol.detectionCooldown || 0,1.0);
+      ensurePatrolVisual(ship);
+    }else if(dist > .001){
+      ship._headingDeg = Math.atan2(dy,dx) * 180 / Math.PI;
+      ship.x += dx/dist*Math.min(step,dist);
+      ship.y += dy/dist*Math.min(step,dist);
+    }
+    return;
+  }
+
+  patrol.angle += .22 * patrol.direction * dtGame;
+  ship.x = patrol.cx + Math.cos(patrol.angle)*patrol.orbitRadius;
+  ship.y = patrol.cy + Math.sin(patrol.angle)*patrol.orbitRadius*.70;
+
+  patrol.detectionCooldown = Math.max(0,(patrol.detectionCooldown || 0)-dtGame);
+  if(patrol.detectionCooldown <= 0){
+    patrol.detectionCooldown = 1.1;
+    const enemy = findNearestEnemy(ship,patrol.radius);
+    if(enemy){
+      removePatrolVisual(ship);
+      beginCombat(ship,enemy,true);
+    }
+  }
+}
+
+function updateScouts(dt){
+  if(!gameStarted) return;
+  const stepScale = dt * gameSpeed;
+
+  // Копия нужна, потому что корабль может быть уничтожен во время цикла.
+  for(const scout of [...scouts]){
+    if(scout.destroyed) continue;
+
+    // Запоминаем фактическую позицию в начале кадра. В конце кадра по смещению
+    // определяем направление движения и поворачиваем нос корабля точно по курсу.
+    const previousX = scout.x;
+    const previousY = scout.y;
+
+    if(scout.cooldownState){
+      updateScoutCooldown(scout,stepScale);
+    }
+
+    if(scout.combatTarget){
+      updateCombat(scout,stepScale);
+    }else if(scout.patrolState){
+      updatePatrol(scout,stepScale);
+    }else if(scout.targetPoint){
+      const target = scout.targetPoint;
+      const dx = target.x - scout.x;
+      const dy = target.y - scout.y;
+      const dist = Math.hypot(dx,dy);
+      const step = shipMoveSpeed(scout) * stepScale;
+      if(dist <= Math.max(step,3)){
+        scout.x = target.x;
+        scout.y = target.y;
+        scout.targetPoint = null;
+        scout.stationary = true;
+        clearWaypointMarker(scout);
+        if(scout.owner === 'player') pushEvent(scout.name + ' прибыл в указанную точку и ожидает приказа.', 'discovery');
+      }else{
+        scout.x += dx / dist * step;
+        scout.y += dy / dist * step;
+      }
+    }else if(scout.targetPlanet){
+      const target = scout.targetPlanet;
+      const dx = target.x - scout.x;
+      const dy = target.y - scout.y;
+      const dist = Math.hypot(dx,dy);
+      const step = shipMoveSpeed(scout) * stepScale;
+
+      if(dist <= Math.max(step, 3)){
+        if(target.kind === 'researchAsteroid'){
+          beginOrbit(scout,target);
+          if(scout.owner === 'player' && scout.canMineResearch){
+            if(getAsteroidMinerCount(target, scout) > 2){
+              scoutCommandHint.textContent = 'На астероиде уже работают 2 добытчика.';
+              scoutCommandHint.classList.add('show');
+              setTimeout(() => scoutCommandHint.classList.remove('show'), 2400);
+            }else if(scout.researchMining && scout.researchMining.asteroid && scout.researchMining.asteroid.id === target.id){
+              scout.researchMining.stage = 'mining';
+              scout.researchMining.remaining = scout.researchMining.miningTime || 14;
+              scoutCommandHint.textContent = scout.name + ' начал новый цикл добычи на астероиде.';
+              scoutCommandHint.classList.add('show');
+              setTimeout(() => scoutCommandHint.classList.remove('show'), 2400);
+            }else{
+              startResearchMining(scout,target);
+              scoutCommandHint.textContent = scout.name + ' начал добычу Ксенита.';
+              scoutCommandHint.classList.add('show');
+              setTimeout(() => scoutCommandHint.classList.remove('show'), 2600);
+            }
+          }
+        }else if(scout.owner === 'player'){
+          if(scout.canScan){
+            exploredAreas.push({x:target.x, y:target.y, r:230});
+            drawFog();
+          }
+
+          beginOrbit(scout, target);
+
+          const isResourceDelivery = finishResourceTransportArrival(scout,target);
+
+          const isMiningReturn = !!(
+            scout.canMineResearch &&
+            scout.researchMining &&
+            scout.researchMining.stage === 'returning' &&
+            scout.researchMining.homePlanet &&
+            scout.researchMining.homePlanet.id === target.id
+          );
+          const isPlanetMiningReturn = !!(
+            scout.planetMining &&
+            scout.planetMining.stage === 'returning' &&
+            scout.planetMining.homePlanet &&
+            scout.planetMining.homePlanet.id === target.id
+          );
+          const isPlanetMiningTarget = !!(
+            scout.canMinePlanet &&
+            target.owner === 'neutral' &&
+            !target.habitable &&
+            target.playerScanned
+          );
+
+          if(isResourceDelivery){
+            // Груз автоматически выгружен. Корабль остаётся на орбите и готов к новому рейсу.
+          }else if(isMiningReturn){
+            depositAsteroidCargo(scout, target);
+
+            scoutCommandHint.textContent = scout.researchMining
+              ? scout.name + ' выгрузил ресурс и снова отправился к астероиду.'
+              : scout.name + ' вернулся на базу и завершил автоматические рейсы.';
+            scoutCommandHint.classList.add('show');
+            clearTimeout(updateScouts._timer);
+            updateScouts._timer = setTimeout(() => scoutCommandHint.classList.remove('show'), 3200);
+          }else if(isPlanetMiningReturn){
+            depositPlanetMiningCargo(scout,target);
+            scoutCommandHint.textContent = scout.planetMining
+              ? scout.name + ' выгрузил ресурсы и снова отправился на добычу.'
+              : scout.name + ' вернулся на базу и завершил добывающие рейсы.';
+            scoutCommandHint.classList.add('show');
+            clearTimeout(updateScouts._timer);
+            updateScouts._timer = setTimeout(() => scoutCommandHint.classList.remove('show'), 3200);
+          }else if(isPlanetMiningTarget){
+            if(getPlanetMinerCount(target,scout) >= 2 && !(scout.planetMining && scout.planetMining.planet?.id === target.id)){
+              scoutCommandHint.textContent = 'На этой планете уже работают 2 грузовых корабля.';
+              scoutCommandHint.classList.add('show');
+              setTimeout(()=>scoutCommandHint.classList.remove('show'),2400);
+            }else if(scout.planetMining && scout.planetMining.planet?.id === target.id){
+              scout.planetMining.stage = 'mining';
+              scout.planetMining.remaining = scout.planetMining.miningTime || 18;
+              scoutCommandHint.textContent = scout.name + ' начал новый цикл загрузки ресурсов.';
+              scoutCommandHint.classList.add('show');
+              setTimeout(()=>scoutCommandHint.classList.remove('show'),2400);
+            }else if(startPlanetResourceMining(scout,target)){
+              scoutCommandHint.textContent = scout.name + ' начал загрузку ресурсов для доставки в империю.';
+              scoutCommandHint.classList.add('show');
+              setTimeout(()=>scoutCommandHint.classList.remove('show'),2600);
+            }
+          }else{
+            startPlanetScan(scout, target);
+
+          if(scout.scanState){
+            scoutCommandHint.textContent =
+              scout.name + ' вышел на орбиту. Начато изучение планеты: 60 сек.';
+            pushEvent(
+              scout.name + ' достиг планеты и вышел на орбиту. Запущено сканирование.',
+              'discovery'
+            );
+          }else{
+            scoutCommandHint.textContent =
+              scout.name + ' достиг планеты и вышел на орбиту.';
+            pushEvent(
+              scout.name + ' прибыл к «' + target.name + '».',
+              'discovery'
+            );
+          }
+
+          scoutCommandHint.classList.add('show');
+          clearTimeout(updateScouts._timer);
+          updateScouts._timer = setTimeout(() => scoutCommandHint.classList.remove('show'), 3500);
+          }
+        }else{
+          const arrivedId = target.id;
+          enemyReservedPlanetIds.delete(arrivedId);
+          if(
+            scout.type === 'colonizer' &&
+            target.owner === 'neutral' &&
+            target.habitable &&
+            enemyVisitedPlanetIds.has(target.id)
+          ){
+            enemyColonizePlanet(scout,target);
+            continue;
+          }
+          beginOrbit(scout, target);
+          startPlanetScan(scout, target);
+        }
+      }else{
+        scout.x += dx / dist * step;
+        scout.y += dy / dist * step;
+        revealAlongScout(scout);
+      }
+    }else if(scout.orbitPlanet){
+      scout.orbitAngle += scout.orbitAngularSpeed * scout.orbitDirection * stepScale;
+      placeScoutOnOrbit(scout);
+
+      if(scout.researchMining){
+        updateResearchMining(scout, stepScale);
+      }else if(scout.planetMining){
+        updatePlanetResourceMining(scout, stepScale);
+      }else if(scout.scanState){
+        updatePlanetScan(scout, stepScale);
+      }else if(
+        scout.owner === 'enemy' &&
+        scout.type === 'scout' &&
+        !scout.cooldownState
+      ){
+        scout.idleTimer -= stepScale;
+        if(scout.idleTimer <= 0){
+          chooseEnemyScoutTarget(scout);
+          scout.idleTimer = enemyScoutDecisionDelay();
+        }
+      }
+    }else if(scout.stationary){
+      // Ничего не делаем — корабль стоит в точке до нового приказа.
+    }
+
+    const movedX = scout.x - previousX;
+    const movedY = scout.y - previousY;
+    if(Math.hypot(movedX,movedY) > 0.015){
+      scout._headingDeg = Math.atan2(movedY,movedX) * 180 / Math.PI;
+    }
+
+    revealAlongScout(scout);
+    updateScoutElement(scout);
+  }
+}
+
+
+function aiStartBuilding(planet,type){
+  const def = BUILDING_DEFS[type];
+  if(!def) return false;
+  if(!planet.buildingQueues) planet.buildingQueues = {};
+  if(planet.buildingQueues[type]) return false;
+  if(def.single && (planet.buildings[type] || 0) >= 1) return false;
+  if(def.resource && !planet.resources.includes(def.resource)) return false;
+  if(!spendCost(planet,def.cost)) return false;
+  planet.buildingQueues[type] = {type,remaining:def.time,total:def.time};
+  return true;
+}
+function aiQueueShip(planet,type){
+  const def = SHIP_DEFS[type];
+  if(!def || planet.shipQueue || !spendCost(planet,def.cost)) return false;
+  planet.shipQueue = {type,remaining:def.time,total:def.time,pending:[]};
+  return true;
+}
+function enableEnemyPatrolQuiet(ship,aroundPlanet=null){
+  if(!ship || ship.destroyed) return;
+  const cx = aroundPlanet?.x ?? ship.x;
+  const cy = aroundPlanet?.y ?? ship.y;
+  ship.targetPlanet = null;
+  ship.targetPoint = null;
+  ship.orbitPlanet = null;
+  ship.researchMining = null;
+  ship.combatTarget = null;
+  ship.stationary = false;
+  const patrolRadius = gameSettings.aiDifficulty === 'aggressive' ? 235 : 195;
+  ship.patrolState = {
+    cx,cy,
+    radius:patrolRadius,
+    chaseRadius:Math.max(patrolRadius + 120, patrolRadius * 1.65),
+    orbitRadius:58,
+    angle:Math.random()*Math.PI*2,
+    direction:Math.random()<.5?-1:1,
+    detectionCooldown:0,
+    returning:false,
+    chasing:false,
+    chaseTargetId:null
+  };
+  if(!gameSettings.fog) ensurePatrolVisual(ship);
+}
+function findEnemyColonizationTarget(){
+  return planets
+    .filter(p=>p.owner === 'neutral' && p.habitable && enemyVisitedPlanetIds.has(p.id))
+    .sort((a,b)=>Math.hypot(a.x-enemyPlanet.x,a.y-enemyPlanet.y)-Math.hypot(b.x-enemyPlanet.x,b.y-enemyPlanet.y))[0] || null;
+}
+function enemyCombatShips(){
+  return scouts.filter(s=>s.owner === 'enemy' && !['scout','cargo','colonizer','researchMiner'].includes(s.type));
+}
+function assignEnemyShipOrder(ship){
+  if(!ship || ship.destroyed) return;
+  if(ship.type === 'scout'){
+    ship.idleTimer = Math.max(1.5,enemyScoutDecisionDelay()*.35);
+    return;
+  }
+  if(ship.type === 'colonizer'){
+    const target = findEnemyColonizationTarget();
+    if(target){ setScoutTarget(ship,target,{silent:true}); }
+    return;
+  }
+  if(['cargo','researchMiner'].includes(ship.type)) return;
+
+  // Свежепостроенный военный корабль больше НИКОГДА не летит к игроку сам по себе.
+  // Сначала он остаётся в обороне своей колонии. Наступление запускается отдельно,
+  // только после фазы развития и только сформированной группой кораблей.
+  enableEnemyPatrolQuiet(ship,ship.orbitPlanet || ship.homePlanet || enemyPlanet);
+}
+
+function enemyEconomyDevelopmentScore(){
+  const colonies = planets.filter(p=>p.owner === 'enemy');
+  let mineLevels = 0;
+  let infrastructure = 0;
+  colonies.forEach(p=>{
+    mineLevels += (p.buildings?.ironMine||0) + (p.buildings?.copperMine||0) + (p.buildings?.lithiumMine||0);
+    infrastructure += (p.buildings?.foodFarm||0) + (p.buildings?.waterPlant||0) + (p.buildings?.habitat||0) + (p.buildings?.scienceCenter||0);
+  });
+  return {colonies,mineLevels,infrastructure};
+}
+
+function enemyAttackCandidates(){
+  return enemyCombatShips().filter(ship=>{
+    if(!ship || ship.destroyed || ship.combatTarget || ship.targetPlanet || ship.targetPoint) return false;
+    // Уже находящиеся у территории игрока корабли не забираем в новую волну.
+    const patrolNearPlayer = ship.patrolState && Math.hypot(ship.patrolState.cx-playerPlanet.x,ship.patrolState.cy-playerPlanet.y) < 500;
+    return !patrolNearPlayer;
+  });
+}
+
+function launchEnemyAttackWave(){
+  const profile = getAIProfile();
+
+  // В начале партии ИИ обязан развиваться, а не рашить стартовую планету игрока.
+  if(gameElapsed < profile.peaceTime) return false;
+  if(enemyAIState.attackCooldown > 0) return false;
+
+  const development = enemyEconomyDevelopmentScore();
+  // Нормальная атака начинается после появления второй колонии или заметного развития добычи.
+  // Есть страховка от вечного бездействия: спустя ещё 4 минуты одной развитой стартовой базы достаточно.
+  const economyReady = development.colonies.length >= 2 || development.mineLevels >= 5;
+  if(!economyReady && gameElapsed < profile.peaceTime + 240) return false;
+
+  const candidates = enemyAttackCandidates();
+  // ИИ всегда оставляет хотя бы одного защитника на каждую свою колонию.
+  const defendersToKeep = Math.max(1,development.colonies.length);
+  const availableForAttack = Math.max(0,candidates.length - defendersToKeep);
+  if(availableForAttack < profile.attackFleetMin) return false;
+
+  const militaryBias = gameSettings.aiPersonality === 'militarist' ? 1.35 : gameSettings.aiPersonality === 'economist' ? .55 : 1;
+  const launchChance = Math.min(.72,(.16 + profile.aggression*.72) * militaryBias);
+  if(Math.random() >= launchChance) return false;
+
+  const waveSize = Math.min(profile.attackWaveMax,availableForAttack);
+  // Более быстрые корабли не должны убегать вперёд по одному: выбираем одну общую ударную группу.
+  const wave = candidates
+    .sort((a,b)=>Math.hypot(a.x-enemyPlanet.x,a.y-enemyPlanet.y)-Math.hypot(b.x-enemyPlanet.x,b.y-enemyPlanet.y))
+    .slice(0,waveSize);
+
+  const angle = Math.random()*Math.PI*2;
+  const distance = 145 + Math.random()*70;
+  const target = {
+    x:playerPlanet.x + Math.cos(angle)*distance,
+    y:playerPlanet.y + Math.sin(angle)*distance
+  };
+
+  wave.forEach(ship=>{
+    ship.targetPlanet = null;
+    ship.targetPoint = {...target};
+    ship.orbitPlanet = null;
+    ship.researchMining = null;
+    ship.combatTarget = null;
+    ship.stationary = false;
+    ship.patrolState = null;
+    ship.autoPatrolPlanet = null;
+    removePatrolVisual(ship);
+  });
+
+  enemyAIState.attackCooldown = profile.attackCooldown;
+  if(!gameSettings.fog){
+    pushEvent('Наблюдение: противник сформировал ударную группу из ' + wave.length + ' кораблей.','discovery');
+  }
+  return true;
+}
+function enemyColonizePlanet(ship,planet){
+  if(!ship || !planet || planet.owner !== 'neutral') return false;
+  planet.owner = 'enemy';
+  planet.population = Math.max(100,Math.floor(ship.colonists || 300));
+  planet.stockpile = {'Железо':260,'Медь':150,'Литий':100,'Алюминий':60};
+  planet.buildings.shipyard = 1;
+  planet.buildings.foodFarm = 1;
+  planet.buildings.waterPlant = 1;
+  planet.buildings.habitat = 1;
+  updatePlanetMapData(planet);
+  buildMiniMapDots();
+  if(!gameSettings.fog){
+    pushEvent('Наблюдение: ИИ основал колонию «' + planet.name + '».','discovery');
+  }
+  destroyShip(ship,null);
+  return true;
+}
+function enemyAIChooseShip(planet){
+  const profile = getAIProfile();
+  const enemyPlanets = planets.filter(p=>p.owner === 'enemy');
+  const queuedScouts = enemyPlanets.filter(p=>p.shipQueue?.type === 'scout').length;
+  const queuedColonizers = enemyPlanets.filter(p=>p.shipQueue?.type === 'colonizer').length;
+  const queuedCombat = enemyPlanets.filter(p=>p.shipQueue && !['scout','cargo','colonizer','researchMiner'].includes(p.shipQueue.type)).length;
+  const ownScouts = scouts.filter(s=>s.owner === 'enemy' && s.type === 'scout').length + queuedScouts;
+  const ownColonizers = scouts.filter(s=>s.owner === 'enemy' && s.type === 'colonizer').length + queuedColonizers;
+  const enemyColonies = enemyPlanets.length;
+  const ownCombat = enemyCombatShips().length + queuedCombat;
+  const colonyTarget = findEnemyColonizationTarget();
+
+  // Первые решения ИИ — разведка и расширение, а не спам боевых кораблей.
+  if(ownScouts < (gameSettings.aiDifficulty === 'easy' ? 2 : 3)) return 'scout';
+  if(colonyTarget && ownColonizers === 0 && enemyColonies < profile.maxColonies){
+    if(gameSettings.aiPersonality !== 'militarist' || Math.random() < .70) return 'colonizer';
+  }
+
+  // Пока действует стартовая фаза развития, ограничиваем военный флот.
+  // Стартовый перехватчик входит в этот лимит.
+  if(gameElapsed < profile.peaceTime && ownCombat >= profile.earlyCombatCap) return null;
+
+  const pools = {
+    economist:['interceptor','corvette','cargo','guardian','frigate'],
+    balanced:['interceptor','corvette','frigate','guardian','destroyer'],
+    militarist:['interceptor','corvette','frigate','destroyer','cruiser']
+  };
+  const pool = pools[gameSettings.aiPersonality] || pools.balanced;
+  for(let i=pool.length-1;i>=0;i--){
+    const type = pool[Math.floor(Math.random()*(i+1))];
+    if(canAfford(planet,SHIP_DEFS[type].cost)) return type;
+  }
+  return canAfford(planet,SHIP_DEFS.interceptor.cost) ? 'interceptor' : null;
+}
+function enemyAIThink(){
+  const profile = getAIProfile();
+  const colonies = planets.filter(p=>p.owner === 'enemy');
+
+  colonies.forEach(planet=>{
+    if(!planet.buildingQueues) planet.buildingQueues = {};
+
+    if(!Object.keys(planet.buildingQueues).length){
+      const mineTargets = [
+        ['Железо','ironMine'],['Медь','copperMine'],['Литий','lithiumMine']
+      ].filter(([resource,type])=>planet.resources.includes(resource) && (planet.buildings[type]||0) < (gameSettings.aiPersonality === 'economist' ? 3 : 2));
+
+      let built = false;
+      for(const [,type] of mineTargets){
+        if(aiStartBuilding(planet,type)){ built = true; break; }
+      }
+      if(!built && gameSettings.aiPersonality === 'economist'){
+        for(const type of ['foodFarm','waterPlant','habitat','scienceCenter']){
+          if((planet.buildings[type]||0) < (type === 'scienceCenter' ? 1 : 2) && aiStartBuilding(planet,type)) break;
+        }
+      }
+    }
+
+    if(!planet.shipQueue){
+      const type = enemyAIChooseShip(planet);
+      if(type) aiQueueShip(planet,type);
+    }
+  });
+
+  // Корабли, долетевшие в боевую точку, переходят в патруль и ищут цели.
+  enemyCombatShips().forEach(ship=>{
+    if(ship.stationary && !ship.patrolState && !ship.combatTarget){
+      enableEnemyPatrolQuiet(ship,null);
+    }
+  });
+
+  // Наступление — отдельное стратегическое решение, а не приказ каждому новому кораблю.
+  launchEnemyAttackWave();
+
+  enemyAIState.thinkTimer = profile.think * (.86 + Math.random()*.28);
+}
+function updateEnemyAI(dtGame){
+  if(!gameStarted) return;
+  const profile = getAIProfile();
+  const colonies = planets.filter(p=>p.owner === 'enemy');
+  enemyAIState.attackCooldown = Math.max(0,(enemyAIState.attackCooldown||0) - dtGame);
+
+  colonies.forEach(p=>{
+    // Базовая экономика ИИ. Сложность определяет ресурсный темп.
+    addStock(p,'Железо',.34*profile.income*dtGame);
+    addStock(p,'Медь',.22*profile.income*dtGame);
+    addStock(p,'Литий',.14*profile.income*dtGame);
+    addStock(p,'Алюминий',.055*profile.income*dtGame);
+
+    for(const [type,def] of Object.entries(BUILDING_DEFS)){
+      if(def.resource && def.production){
+        const count = p.buildings?.[type] || 0;
+        if(count) addStock(p,def.resource,count*def.production*profile.income*dtGame);
+      }
+    }
+
+    for(const [type,q] of Object.entries({...p.buildingQueues || {}})){
+      q.remaining -= dtGame*profile.buildSpeed;
+      if(q.remaining <= 0){
+        delete p.buildingQueues[type];
+        p.buildings[type] = (p.buildings[type]||0)+1;
+        if(!gameSettings.fog) pushEvent('Наблюдение: ИИ завершил «'+BUILDING_DEFS[type].name+'» на «'+p.name+'».','discovery');
+      }
+    }
+
+    if(p.shipQueue){
+      p.shipQueue.remaining -= dtGame*profile.buildSpeed;
+      if(p.shipQueue.remaining <= 0){
+        const type = p.shipQueue.type;
+        p.shipQueue = null;
+        const ship = makeBuiltShip('enemy',p,type);
+        if(!gameSettings.fog) pushEvent('Наблюдение: ИИ построил корабль «'+ship.name+'».','discovery');
+        assignEnemyShipOrder(ship);
+      }
+    }
+  });
+
+  enemyAIState.thinkTimer -= dtGame;
+  if(enemyAIState.thinkTimer <= 0) enemyAIThink();
+}
+
+function gameLoop(now){
+  const effectiveFps = gameSettings.powerSaver ? 30 : Number(gameSettings.fps || 60);
+  const minFrameMs = effectiveFps <= 30 ? 1000/30 : 0;
+
+  if(minFrameMs && now-lastFrameTime < minFrameMs){
+    requestAnimationFrame(gameLoop);
+    return;
+  }
+
+  const dt = Math.min(.05,(now-lastFrameTime)/1000);
+  lastFrameTime = now;
+
+  if(gameStarted){
+    const dtGame = dt*gameSpeed;
+    gameElapsed += dtGame;
+    fleetMenuUiAccumulator += dt;
+
+    // Экономика, ИИ, исследования и захват не требуют 60 вычислений/сек.
+    PERF.simulationAccumulator += dtGame;
+    if(PERF.simulationAccumulator >= PERF.simulationStep){
+      const simDt = Math.min(.75,PERF.simulationAccumulator);
+      PERF.simulationAccumulator = 0;
+
+      updateEconomy(simDt);
+      updateEnemyAI(simDt);
+      updateResearch(simDt);
+      updateCaptures(simDt);
+    }
+
+    if(
+      fleetMenuUiAccumulator >= 1 &&
+      currentFleetPlanet &&
+      planetFleetOverlay.classList.contains('open')
+    ){
+      fleetMenuUiAccumulator = 0;
+      // Не пересобираем меню прямо под пальцем: это могло сбрасывать прокрутку
+      // и уничтожать кнопку между pointerdown и click на медленных телефонах.
+      if(performance.now() - planetMenuInteractionAt > 900){
+        const savedScroll = planetMenuContent.scrollTop;
+        planetFleetResources.innerHTML = planetHeaderSummaryHtml(currentFleetPlanet,true);
+        renderPlanetMenuTab(currentFleetPlanet);
+        planetMenuContent.scrollTop = savedScroll;
+      }
+    }
+
+    if(resourceBarPlanet){
+      updateSelectedPlanetResourceBar(false);
+    }
+  }
+
+  // Движение кораблей остаётся плавным.
+  updateScouts(dt);
+
+  // Все дополнительные игровые системы работают через один центральный цикл.
+  // Это заменяет независимые requestAnimationFrame-циклы модулей и уменьшает
+  // лишнюю работу на мобильных устройствах.
+  if(typeof window.AECentralTick === 'function'){
+    try{ window.AECentralTick(gameStarted ? dt*gameSpeed : 0, now); }
+    catch(err){ console.error('Central systems tick error:',err); }
+  }
+
+  // Тяжёлые DOM-обновления и проверка видимости выполняются реже.
+  updateMiniDynamic(false);
+  updateWorldCulling(false);
+
+  requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+
+function startGame(){
+  if(gameStarted) return;
+  try{
+    if(window.AndroidApp && typeof window.AndroidApp.setLandscape === 'function'){
+      window.AndroidApp.setLandscape();
+    }
+  }catch(e){}
+  ensureEventAudio();
+  enemyAIState.thinkTimer = Math.max(4,getAIProfile().think*.45);
+  enemyAIState.attackCooldown = 0;
+  PERF.simulationAccumulator = 0;
+  PERF.miniLast = 0;
+  PERF.resourceLast = 0;
+  PERF.cullingDirty = true;
+  gameStarted = true;
+  mainMenu.style.display = 'none';
+  gameSettingsButton.style.display = 'block';
+  fleetGroupsButton.style.display = 'block';
+  startCamera();
+  addStartTip();
+  spawnInitialScouts();
+  setResourceBarPlanet(playerPlanet);
+
+  pushEvent('Игра началась. Население стартовой планеты: 1 200 человек.', 'success');
+  pushEvent('На орбите стартовой планеты находятся два спутника-разведчика.', 'discovery');
+  pushEvent('Стартовый склад: Железо 560 • Медь 320 • Литий 220 • Алюминий 120. Этого хватает на один колонизационный корабль.', 'resource');
+  pushEvent('Первый шаг: нажмите на «Аврора Прайм», откройте управление и постройте железодобывающую станцию.', 'success');
+
+  scoutCommandHint.textContent = 'Нажмите на Аврора Прайм — в карточке планеты появится подсказка по первому развитию колонии.';
+  scoutCommandHint.classList.add('show');
+  setTimeout(() => scoutCommandHint.classList.remove('show'), 6000);
+}
+startGameBtn.addEventListener('click', startGame);
+
+function startCamera(){ x = innerWidth/2 - playerPlanet.x*scale; y = innerHeight/2 - (playerPlanet.y - 120)*scale; render(); }
+window.addEventListener('resize', () => {
+  PERF.cullingDirty = true;
+  buildMiniMapDots();
+  drawFog(true);
+  render();
+  updateWorldCulling(true);
+});
+buildStars(); buildPlanets(); renderResearchAsteroids(); buildMiniMapDots(); drawFog(true); startCamera(); updateWorldCulling(true); window.demoRevealArea = revealArea; window.startPlanetCapture = startPlanetCapture;
+</script>
+<style id="aeLivingGalaxyStyles">
+#aeGalaxyButton{position:fixed;left:126px;bottom:18px;z-index:212;height:48px;min-width:48px;padding:0 13px;border-radius:14px;border:1px solid rgba(90,220,255,.42);background:linear-gradient(180deg,rgba(10,42,70,.96),rgba(5,18,36,.96));color:#e9fbff;font-weight:900;font-size:17px;box-shadow:0 5px 20px rgba(0,0,0,.4),0 0 18px rgba(70,205,255,.12);touch-action:manipulation}
+#aeGalaxyButton:active{transform:scale(.97)}
+#aeGalaxyButton .aeBadge{position:absolute;right:-5px;top:-6px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#6bdef5;color:#04131f;font-size:10px;line-height:18px;font-weight:950;display:none}
+#aeGalaxyOverlay{position:fixed;inset:0;z-index:520;display:none;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;background:rgba(0,3,10,.58);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+#aeGalaxyOverlay.open{display:flex}.aeGalaxyPanel{width:min(100%,520px);max-height:88vh;overflow:auto;border-radius:22px;border:1px solid rgba(100,220,255,.28);background:radial-gradient(circle at 18% 0%,rgba(74,201,255,.10),transparent 35%),linear-gradient(180deg,rgba(8,20,39,.99),rgba(4,10,23,.995));box-shadow:0 26px 75px rgba(0,0,0,.7);color:#eaf7ff;padding:17px;box-sizing:border-box}.aeGalaxyHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.aeGalaxyTitle{font-size:22px;font-weight:950}.aeGalaxySub{font-size:11px;color:#93adc2;margin-top:4px}.aeClose{width:38px;height:38px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#fff;font-size:21px}.aeSection{margin-top:14px;padding:13px;border-radius:16px;border:1px solid rgba(135,204,235,.13);background:rgba(7,18,34,.72)}.aeSectionTitle{font-size:13px;font-weight:900;color:#a8eaff;text-transform:uppercase;letter-spacing:.6px;margin-bottom:9px}.aeGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.aeCard{padding:10px;border-radius:12px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.075)}.aeCard b{font-size:12px}.aeCard small{display:block;color:#9db2c5;font-size:10px;line-height:1.35;margin-top:4px}.aeCard.locked{opacity:.48;filter:saturate(.45)}.aeChip{display:inline-flex;align-items:center;gap:5px;margin:3px 4px 3px 0;padding:5px 8px;border-radius:999px;background:rgba(74,202,255,.10);border:1px solid rgba(92,221,255,.18);font-size:10px;color:#d9f9ff}.aeIntelRow{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.055);font-size:11px}.aeIntelRow:last-child{border-bottom:0}.aeIntelMain{min-width:0}.aeIntelMain b{display:block;color:#fff}.aeIntelMain small{color:#93a9bc}.aeIntelLevel{white-space:nowrap;color:#7de8ff;font-weight:800}.aeMuted{font-size:11px;color:#8499ab;line-height:1.45}.aeEventLine{padding:7px 9px;border-radius:10px;background:rgba(255,196,91,.07);border:1px solid rgba(255,196,91,.13);font-size:11px;margin-top:6px}.aeCommanderLine{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);display:flex;gap:8px;align-items:center;justify-content:space-between}.aeCommanderLine label{font-size:11px;color:#a9b9c8}.aeCommanderSelect{max-width:230px;min-width:0;padding:7px 8px;border-radius:10px;border:1px solid rgba(171,145,255,.28);background:#0a1426;color:#eef7ff;font-size:11px}.aeVeteranBadge{display:inline-flex;margin-left:6px;padding:2px 6px;border-radius:999px;background:rgba(255,210,85,.10);border:1px solid rgba(255,210,85,.18);color:#ffe59a;font-size:9px;font-weight:900}.aeSpecialization{margin-top:14px}.aeSpecGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.aeSpecBtn{padding:10px;text-align:left;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.045);color:#eaf7ff}.aeSpecBtn.active{border-color:rgba(83,225,255,.48);background:rgba(45,170,205,.14);box-shadow:0 0 14px rgba(57,202,240,.08)}.aeSpecBtn b{display:block;font-size:12px}.aeSpecBtn small{display:block;margin-top:4px;color:#9db0c2;font-size:10px;line-height:1.35}.aeTraitNote{margin-top:6px;color:#b9f0ff;font-size:11px}.aeAnomalyLayer{position:absolute;inset:0;z-index:36;pointer-events:none}.aeAnomaly{position:absolute;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;display:none;align-items:center;justify-content:center;pointer-events:auto;touch-action:none;color:#fff;font-size:18px;font-weight:950;border:1px solid rgba(137,234,255,.65);background:radial-gradient(circle,rgba(86,220,255,.30),rgba(41,87,143,.18) 45%,rgba(6,15,30,.88) 72%);box-shadow:0 0 10px rgba(94,223,255,.7),0 0 28px rgba(96,130,255,.34);animation:aePulse 1.8s ease-in-out infinite}.aeAnomaly.discovered{display:flex}.aeAnomaly.resolved{display:none}.aeAnomalyLabel{position:absolute;top:38px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;color:#bfefff;text-shadow:0 1px 3px #000}.aeAnomaly.targeted{box-shadow:0 0 10px #fff,0 0 34px rgba(130,115,255,.8)}.aeAnomaly.ready{width:50px;height:50px;z-index:5;border-color:rgba(255,224,105,.92);color:#fff5bd;background:radial-gradient(circle,rgba(255,218,89,.38),rgba(160,99,30,.20) 48%,rgba(18,11,4,.90) 74%);box-shadow:0 0 12px rgba(255,229,107,.92),0 0 34px rgba(255,171,66,.42)}.aeLootTitle{margin-top:14px;font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#8edfff;font-weight:900}.aeLootList{display:grid;gap:7px;margin-top:8px}.aeLootRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;align-items:center;padding:9px 10px;border-radius:11px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);font-size:11px}.aeLootRow b{color:#fff4b3}.aeLootRow small{grid-column:1/-1;color:#96afc2;line-height:1.35}.aeLootRow.tech{border-color:rgba(189,137,255,.20);background:rgba(121,72,179,.08)}.aeLootRoute{margin-top:11px;padding:9px 10px;border-radius:11px;background:rgba(76,190,255,.07);border:1px solid rgba(90,207,255,.13);font-size:10px;line-height:1.45;color:#a9c6d8}.aeTakeAllBtn{border-color:rgba(101,237,167,.34)!important;background:linear-gradient(180deg,rgba(31,133,88,.32),rgba(11,73,50,.38))!important}.aeLaterBtn{opacity:.78}@keyframes aePulse{0%,100%{transform:translate(-50%,-50%) scale(.94);opacity:.75}50%{transform:translate(-50%,-50%) scale(1.08);opacity:1}}
+#aeInfluenceCanvas{position:absolute;left:0;top:0;z-index:16;pointer-events:none;width:3200px;height:2600px;opacity:.72}.aeEncounterOverlay{position:fixed;inset:0;z-index:560;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(0,3,10,.70);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}.aeEncounterOverlay.open{display:flex}.aeEncounter{width:min(100%,460px);border-radius:21px;padding:18px;border:1px solid rgba(146,223,255,.28);background:radial-gradient(circle at 25% 0%,rgba(77,174,255,.12),transparent 35%),linear-gradient(180deg,#0a1930,#050c1b);box-shadow:0 25px 70px rgba(0,0,0,.72);color:#eaf7ff}.aeEncounterIcon{font-size:42px}.aeEncounter h2{font-size:20px;margin:8px 0}.aeEncounter p{font-size:12px;line-height:1.5;color:#b9c9d8}.aeEncounterActions{display:grid;gap:8px;margin-top:14px}.aeEncounterActions button{padding:11px 12px;border-radius:12px;border:1px solid rgba(106,218,255,.25);background:rgba(45,140,190,.13);color:#eaffff;font-weight:800;text-align:left}.aeEncounterActions button small{display:block;font-weight:400;color:#9fb5c8;margin-top:3px}.aeRareTechBox{margin-top:12px;padding:11px;border-radius:13px;border:1px solid rgba(187,132,255,.20);background:rgba(126,75,190,.075)}
+@media(max-width:520px){#aeGalaxyButton{left:126px;min-width:46px;padding:0 11px}.aeGalaxyPanel{max-height:91vh}.aeGrid,.aeSpecGrid{grid-template-columns:1fr}.aeCommanderSelect{max-width:190px}}
+</style>
+<button id="aeGalaxyButton" type="button" title="Галактика и разведданные">✦<span class="aeBadge" id="aeGalaxyBadge">0</span></button>
+<div id="aeGalaxyOverlay"><div class="aeGalaxyPanel"><div class="aeGalaxyHead"><div><div class="aeGalaxyTitle">Живая галактика</div><div class="aeGalaxySub">аномалии • археотехнологии • командиры • разведданные</div></div><button class="aeClose" id="aeGalaxyClose" type="button">×</button></div><div id="aeGalaxyContent"></div></div></div>
+<div id="aeEncounterOverlay" class="aeEncounterOverlay"><div class="aeEncounter"><div class="aeEncounterIcon" id="aeEncounterIcon">✦</div><h2 id="aeEncounterTitle">Неизвестный сигнал</h2><p id="aeEncounterText"></p><div class="aeEncounterActions" id="aeEncounterActions"></div></div></div>
+<script id="aeLivingGalaxyExpansion">
+(function(){
+'use strict';
+const AE = window.AELivingGalaxy = {
+  version:'1.0', initialized:false, gameInitialized:false,
+  anomalies:[], anomalySerial:0, rareTechs:new Set(), activeEvents:[],
+  nextEventAt:0, lastGameElapsed:0, lastDiscoveryCheck:0, lastInfluenceDraw:0,
+  alertedEnemyIds:new Set(), callSignIndex:0, currentEncounter:null,
+  unlockedCommanders:new Set(['voss','chen']), solarStormUntil:0
+};
+
+const RARE_TECHS = {
+  archeodrive:{name:'Археодвигатель',icon:'⚡',desc:'+12% скорости всем вашим кораблям.'},
+  quantumLocator:{name:'Квантовый локатор',icon:'📡',desc:'+180 к дальности обнаружения неизвестных планет разведчиками.'},
+  resonantArmor:{name:'Резонансная броня',icon:'◇',desc:'Ваши корабли получают на 12% меньше боевого урона.'},
+  nanoArchive:{name:'Наноархивы предтеч',icon:'⌬',desc:'+15% к глобальной скорости исследований.'},
+  adaptiveMining:{name:'Адаптивная добыча',icon:'⛏',desc:'+12% к добыче всех планетарных шахт.'}
+};
+const COMMANDERS = {
+  voss:{name:'Адмирал Астра Восс',icon:'⚡',desc:'+10% скорость кораблей группы.',speed:.10},
+  hale:{name:'Коммодор Маркус Хейл',icon:'✹',desc:'+12% боевой урон группы.',damage:.12},
+  chen:{name:'Капитан Лира Чен',icon:'◉',desc:'+160 дальности разведчикам группы и +5% скорость.',speed:.05,scoutRange:160},
+  kane:{name:'Адмирал Рея Кейн',icon:'⬡',desc:'−12% входящего урона кораблям группы.',defense:.12}
+};
+const PLANET_TRAITS = [
+  {id:'rich',icon:'⛏',name:'Богатая кора',desc:'+25% планетарной добычи.',mining:.25},
+  {id:'lowGravity',icon:'↟',name:'Низкая гравитация',desc:'Корабли, построенные здесь, получают +8% скорости.',shipSpeed:.08},
+  {id:'ruins',icon:'⌬',name:'Древние руины',desc:'+12% к научному вкладу этой колонии.',science:.12},
+  {id:'biosphere',icon:'✿',name:'Стабильная биосфера',desc:'+20% к естественному росту населения.',growth:.20},
+  {id:'harsh',icon:'☄',name:'Враждебный климат',desc:'−15% к росту населения, но +10% к добыче.',growth:-.15,mining:.10},
+  {id:'crystal',icon:'◆',name:'Кристаллические жилы',desc:'+15% добычи и повышенная ценность месторождений.',mining:.15},
+  {id:'calm',icon:'◌',name:'Спокойная система',desc:'+8% эффективности производства.',mining:.08}
+];
+const SPECIALIZATIONS = {
+  mining:{icon:'⛏',name:'Добывающий мир',desc:'+25% к добыче ресурсов.',mining:.25},
+  industrial:{icon:'⚙',name:'Промышленный мир',desc:'+20% к скорости верфи и +10% к строительству зданий.'},
+  science:{icon:'⚛',name:'Научный мир',desc:'+12% к глобальной скорости исследований.',science:.12},
+  military:{icon:'✦',name:'Военная база',desc:'Построенные здесь боевые корабли: +8% к корпусу и урону.'},
+  logistics:{icon:'⇄',name:'Логистический узел',desc:'+25% вместимости транспортов и добытчиков, +5% скорости.'}
+};
+const CALLSIGNS = ['Аврора','Страж','Гром','Орион','Феникс','Копьё','Вега','Арго','Полюс','Тень','Зенит','Нова','Искра','Атлас','Сокол','Мираж','Титан','Рассвет','Каскад','Вихрь'];
+const RANKS = ['Экипаж','Опытный','Ветеран','Элита','Ас'];
+const XP_LEVELS = [0,50,140,280,480];
+
+function commanderForShip(ship){
+  if(!ship || ship.owner!=='player') return null;
+  const group = fleetGroupForShip(ship);
+  if(!group || !group.commanderId) return null;
+  return COMMANDERS[group.commanderId] || null;
+}
+function shipLevel(ship){
+  const xp = Number(ship?.xp||0); let lvl=1;
+  for(let i=1;i<XP_LEVELS.length;i++) if(xp>=XP_LEVELS[i]) lvl=i+1;
+  return lvl;
+}
+function applyShipLevel(ship, announce=true){
+  if(!ship) return;
+  const lvl=shipLevel(ship), old=ship.veteranLevel||1;
+  ship.veteranLevel=lvl;
+  if(lvl>old){
+    const bonus=.035*(lvl-old);
+    ship.maxHp=Math.round((ship.maxHp||1)*(1+bonus));
+    ship.hp=Math.min(ship.maxHp,Math.round((ship.hp||ship.maxHp)*(1+bonus)));
+    if(announce && ship.owner==='player') pushEvent('Экипаж «'+ship.name+'» получил новый статус: '+RANKS[lvl-1]+' (ур. '+lvl+').','success');
+  }
+}
+function addShipXp(ship,amount,reason=''){
+  if(!ship || ship.destroyed || ship.owner!=='player') return;
+  ship.xp=(ship.xp||0)+Math.max(0,amount||0);
+  applyShipLevel(ship,true);
+}
+function enhanceShip(ship,originPlanet=null){
+  if(!ship || ship._aeEnhanced) return ship;
+  ship._aeEnhanced=true; ship.xp=ship.xp||0; ship.veteranLevel=ship.veteranLevel||1;
+  ship.homePlanet=ship.homePlanet||originPlanet||ship.orbitPlanet||null;
+  const sign=CALLSIGNS[AE.callSignIndex++%CALLSIGNS.length];
+  const base=SHIP_DEFS[ship.type]?.name || ship.name || 'Корабль';
+  ship.name=base+' «'+sign+'»';
+  if(originPlanet?.trait?.shipSpeed) ship._aeOriginSpeedBonus=originPlanet.trait.shipSpeed;
+  if(originPlanet?.specialization==='military' && isMilitaryShipType(ship.type)){
+    ship.maxHp=Math.round((ship.maxHp||1)*1.08); ship.hp=ship.maxHp; ship._aeMilitaryDamage=.08;
+  }
+  if(originPlanet?.specialization==='logistics'){
+    ship._aeOriginSpeedBonus=(ship._aeOriginSpeedBonus||0)+.05;
+    if(ship.cargoCapacity) ship.cargoCapacity=Math.round(ship.cargoCapacity*1.25);
+    if(ship.miningCapacity) ship.miningCapacity=Math.max(1,Math.round(ship.miningCapacity*1.25));
+    if(ship.planetMiningCapacity) ship.planetMiningCapacity=Math.max(1,Math.round(ship.planetMiningCapacity*1.25));
+  }
+  return ship;
+}
+
+// Планетарные особенности назначаются один раз на новую карту.
+planets.forEach((p,i)=>{
+  if(!p.trait){
+    if(p===playerPlanet) p.trait=PLANET_TRAITS.find(t=>t.id==='biosphere');
+    else if(p===enemyPlanet) p.trait=PLANET_TRAITS.find(t=>t.id==='calm');
+    else p.trait={...PLANET_TRAITS[Math.floor(Math.random()*PLANET_TRAITS.length)]};
+  }
+  if(p.owner==='enemy' && !p.specialization) p.specialization = i%2 ? 'industrial' : 'mining';
+});
+
+// Обёртки базовых механик.
+const _makeBuiltShip=makeBuiltShip;
+makeBuiltShip=function(owner,planet,type){ return enhanceShip(_makeBuiltShip(owner,planet,type),planet); };
+const _makeScout=makeScout;
+makeScout=function(owner,planet,index,orbitAngle){ return enhanceShip(_makeScout(owner,planet,index,orbitAngle),planet); };
+const _shipMoveSpeed=shipMoveSpeed;
+shipMoveSpeed=function(ship){
+  let v=_shipMoveSpeed(ship);
+  if(ship?.owner==='player'){
+    v*=1+Math.max(0,(shipLevel(ship)-1)*.015);
+    v*=1+(ship._aeOriginSpeedBonus||0);
+    const c=commanderForShip(ship); if(c?.speed) v*=1+c.speed;
+    if(AE.rareTechs.has('archeodrive')) v*=1.12;
+    if(AE.solarStormUntil>gameElapsed && ship.type==='scout') v*=.82;
+  }
+  return v;
+};
+const _canScoutTargetPlanet=canScoutTargetPlanet;
+canScoutTargetPlanet=function(scout,planet){
+  if(_canScoutTargetPlanet(scout,planet)) return true;
+  if(!scout || scout.owner!=='player' || !scout.canScan || !planet || planet.kind==='researchAsteroid') return false;
+  const origin=scout.orbitPlanet||scout;
+  let range=SCOUT_SENSOR_RANGE;
+  if(AE.rareTechs.has('quantumLocator')) range+=180;
+  const c=commanderForShip(scout); if(c?.scoutRange) range+=c.scoutRange;
+  if(AE.solarStormUntil>gameElapsed) range-=120;
+  return Math.hypot(planet.x-origin.x,planet.y-origin.y)<=Math.max(520,range);
+};
+const _miningProductionMultiplier=miningProductionMultiplier;
+miningProductionMultiplier=function(planet,type){
+  let m=_miningProductionMultiplier(planet,type);
+  if(planet?.trait?.mining) m*=1+planet.trait.mining;
+  if(planet?.specialization==='mining') m*=1.25;
+  if(AE.rareTechs.has('adaptiveMining')) m*=1.12;
+  if(planet?._aeMiningBoostUntil>gameElapsed) m*=1.20;
+  return m;
+};
+const _researchSpeedMultiplier=researchSpeedMultiplier;
+researchSpeedMultiplier=function(){
+  let m=_researchSpeedMultiplier();
+  const scienceWorlds=planets.filter(p=>p.owner==='player'&&p.specialization==='science').length;
+  if(scienceWorlds) m*=1+scienceWorlds*.12;
+  const ruinWorlds=planets.filter(p=>p.owner==='player'&&p.trait?.science).reduce((s,p)=>s+(p.trait.science||0),0);
+  if(ruinWorlds) m*=1+ruinWorlds;
+  if(AE.rareTechs.has('nanoArchive')) m*=1.15;
+  return m;
+};
+const _populationGrowthPerMinute=populationGrowthPerMinute;
+populationGrowthPerMinute=function(planet){
+  let r=_populationGrowthPerMinute(planet);
+  if(planet?.trait?.growth) r*=1+planet.trait.growth;
+  return r;
+};
+const _damageShip=damageShip;
+damageShip=function(target,amount,attacker){
+  let dmg=amount;
+  if(attacker?.owner==='player'){
+    dmg*=1+Math.max(0,(shipLevel(attacker)-1)*.05)+(attacker._aeMilitaryDamage||0);
+    const c=commanderForShip(attacker); if(c?.damage) dmg*=1+c.damage;
+    if(target?.owner==='enemy') addShipXp(attacker,Math.max(.2,dmg*.10));
+  }
+  if(target?.owner==='player'){
+    const c=commanderForShip(target); if(c?.defense) dmg*=1-c.defense;
+    if(AE.rareTechs.has('resonantArmor')) dmg*=.88;
+  }
+  return _damageShip(target,dmg,attacker);
+};
+const _destroyShip=destroyShip;
+destroyShip=function(ship,killer){
+  if(ship && !ship.destroyed && killer?.owner==='player' && ship.owner==='enemy') addShipXp(killer,35+Math.min(65,(ship.maxHp||0)*.035));
+  return _destroyShip(ship,killer);
+};
+const _shipStatusText=shipStatusText;
+shipStatusText=function(ship){
+  const base=_shipStatusText(ship);
+  if(ship?.owner!=='player') return base;
+  const lvl=shipLevel(ship), group=fleetGroupForShip(ship), c=commanderForShip(ship);
+  return base+' • '+RANKS[lvl-1]+' '+lvl+(c?' • '+c.name.split(' ').slice(-1)[0]:'')+(group?' • '+fleetGroupLabel(group):'');
+};
+
+const _completePlayerScan=completePlayerScan;
+completePlayerScan=function(scout,planet){
+  const r=_completePlayerScan(scout,planet);
+  if(planet?.trait) pushEvent('Особенность «'+planet.name+'»: '+planet.trait.icon+' '+planet.trait.name+' — '+planet.trait.desc,'discovery');
+  addShipXp(scout,18,'scan');
+  return r;
+};
+
+const _planetHeaderSummaryHtml=planetHeaderSummaryHtml;
+planetHeaderSummaryHtml=function(planet,known=true){
+  let html=_planetHeaderSummaryHtml(planet,known);
+  if(known && planet?.trait){
+    const chip='<div class="planetSummaryChip"><span class="chipIcon">'+planet.trait.icon+'</span><span class="chipBody"><span class="chipLabel">Особенность</span><span class="chipValue">'+planet.trait.name+'</span></span></div>';
+    html=html.replace(/<\/div>\s*$/,chip+'</div>');
+  }
+  if(known && planet?.owner==='player' && planet.specialization){
+    const sp=SPECIALIZATIONS[planet.specialization];
+    const chip='<div class="planetSummaryChip"><span class="chipIcon">'+sp.icon+'</span><span class="chipBody"><span class="chipLabel">Специализация</span><span class="chipValue">'+sp.name+'</span></span></div>';
+    html=html.replace(/<\/div>\s*$/,chip+'</div>');
+  }
+  return html;
+};
+const _openPlanetInfo=openPlanetInfo;
+openPlanetInfo=function(planet){
+  const r=_openPlanetInfo(planet);
+  if(currentInfoPlanet===planet && (planet.playerScanned||planet.owner==='player') && planet.trait){
+    const base=planetInfoSubtitle.textContent.replace(/\s+•\s+[^•]+$/,'');
+    planetInfoSubtitle.textContent=base+' • '+planet.trait.icon+' '+planet.trait.name;
+  }
+  return r;
+};
+
+function specCardHtml(planet){
+  if(getCivilizationLevel(planet)<2) return '';
+  const current=planet.specialization||'';
+  return '<div class="planetMenuGroup theme-civilization-progress aeSpecialization"><div class="planetMenuGroupTitle">Специализация колонии</div><div class="facilityDesc">Выберите роль мира. Первое назначение бесплатно; смена специализации стоит 150 Железа и 75 Меди.</div><div class="aeSpecGrid">'+Object.entries(SPECIALIZATIONS).map(([id,s])=>'<button class="aeSpecBtn '+(current===id?'active':'')+'" data-ae-spec="'+id+'" type="button"><b>'+s.icon+' '+s.name+(current===id?' • выбрано':'')+'</b><small>'+s.desc+'</small></button>').join('')+'</div></div>';
+}
+function bindSpecButtons(planet){
+  planetMenuContent.querySelectorAll('[data-ae-spec]').forEach(btn=>btn.addEventListener('click',e=>{
+    e.preventDefault();e.stopPropagation(); const id=btn.dataset.aeSpec;
+    if(planet.specialization===id) return;
+    if(planet.specialization && !spendCost(planet,{'Железо':150,'Медь':75})){
+      pushEvent('Для смены специализации нужно 150 Железа и 75 Меди.','discovery'); return;
+    }
+    planet.specialization=id;
+    pushEvent('«'+planet.name+'» теперь: '+SPECIALIZATIONS[id].name+'.','success');
+    renderPlanetMenuTab(planet); updateSelectedPlanetResourceBar(true); drawInfluence();
+  }));
+}
+const _renderPlanetMenuTab=renderPlanetMenuTab;
+renderPlanetMenuTab=function(planet){
+  _renderPlanetMenuTab(planet);
+  if(currentPlanetTab==='civilization' && planet?.owner==='player'){
+    planetMenuContent.insertAdjacentHTML('beforeend',specCardHtml(planet)); bindSpecButtons(planet);
+  }
+};
+const _renderFleetTab=renderFleetTab;
+renderFleetTab=function(planet){
+  _renderFleetTab(planet);
+  const ships=fleetAtPlanet(planet).filter(s=>s.owner==='player');
+  [...planetMenuContent.querySelectorAll('.fleetShip')].slice(0,ships.length).forEach((row,i)=>{
+    const ship=ships[i], status=row.querySelector('.fleetShipStatus'); if(!ship||!status) return;
+    const c=commanderForShip(ship);
+    status.insertAdjacentHTML('beforeend',' <span class="aeVeteranBadge">⭐ '+RANKS[shipLevel(ship)-1]+' '+shipLevel(ship)+' • '+Math.floor(ship.xp||0)+' XP'+(c?' • '+c.name.split(' ').slice(-1)[0]:'')+'</span>');
+  });
+};
+const _renderResearchTab=renderResearchTab;
+renderResearchTab=function(planet){
+  _renderResearchTab(planet);
+  const known=Object.entries(RARE_TECHS).filter(([id])=>AE.rareTechs.has(id));
+  planetMenuContent.insertAdjacentHTML('beforeend','<div class="planetMenuGroup theme-research-exploration"><div class="planetMenuGroupTitle">Археотехнологии</div><div class="facilityDesc">Эти технологии нельзя изучить обычным путём — они находятся в аномалиях и древних объектах.</div><div class="aeRareTechBox">'+(known.length?known.map(([,t])=>'<span class="aeChip">'+t.icon+' '+t.name+'</span>').join(''):'<span class="aeMuted">Пока не обнаружено ни одной археотехнологии.</span>')+'</div></div>');
+};
+
+function assignCommander(group,id){
+  if(!group) return;
+  if(id && !AE.unlockedCommanders.has(id)) return;
+  fleetGroups.forEach(g=>{ if(g!==group && g.commanderId===id) g.commanderId=null; });
+  group.commanderId=id||null;
+  pushEvent(id ? COMMANDERS[id].name+' назначен на '+fleetGroupLabel(group)+'.' : 'Командир снят с '+fleetGroupLabel(group)+'.','success');
+  renderFleetGroupsPanel(); renderGalaxyPanel();
+}
+const _renderFleetGroupsPanel=renderFleetGroupsPanel;
+renderFleetGroupsPanel=function(){
+  _renderFleetGroupsPanel();
+  fleetGroupsList.querySelectorAll('.fleetGroupCard').forEach(card=>{
+    const group=fleetGroups.find(g=>g.id===card.dataset.groupId); if(!group) return;
+    const line=document.createElement('div'); line.className='aeCommanderLine';
+    const options=['<option value="">Без командира</option>'].concat(Object.entries(COMMANDERS).filter(([id])=>AE.unlockedCommanders.has(id)).map(([id,c])=>'<option value="'+id+'" '+(group.commanderId===id?'selected':'')+'>'+c.name+'</option>')).join('');
+    line.innerHTML='<label>🎖 Командир группы</label><select class="aeCommanderSelect">'+options+'</select>';
+    line.querySelector('select').addEventListener('change',e=>assignCommander(group,e.target.value)); card.appendChild(line);
+  });
+};
+
+// Аномалии и экспедиции.
+const anomalyLayer=document.createElement('div'); anomalyLayer.className='aeAnomalyLayer'; anomalyLayer.id='aeAnomalyLayer'; world.insertBefore(anomalyLayer,scoutLayer);
+function anomalyFarEnough(x,y){
+  if(planets.some(p=>Math.hypot(p.x-x,p.y-y)<180)) return false;
+  if((researchAsteroids||[]).some(a=>Math.hypot(a.x-x,a.y-y)<130)) return false;
+  return true;
+}
+function createAnomaly(x=null,y=null,forcedType=null){
+  if(x==null||y==null){
+    for(let i=0;i<120;i++){
+      const tx=rand(170,WORLD_W-170),ty=rand(240,WORLD_H-240);
+      if(anomalyFarEnough(tx,ty) && Math.hypot(tx-playerPlanet.x,ty-playerPlanet.y)>440){x=tx;y=ty;break;}
+    }
+  }
+  if(x==null||y==null) return null;
+  const types=['derelict','ruins','rift','cache','life','wreckfield','beacon','prototype'];
+  const a={id:'anomaly-'+(++AE.anomalySerial),x,y,type:forcedType||types[Math.floor(Math.random()*types.length)],discovered:false,resolved:false,targetedBy:null};
+  const el=document.createElement('button'); el.type='button'; el.className='aeAnomaly'; el.style.left=x+'px'; el.style.top=y+'px'; el.innerHTML='?<span class="aeAnomalyLabel">НЕИЗВЕСТНЫЙ СИГНАЛ</span>';
+  el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();handleAnomalyTap(a);},{passive:false});
+  anomalyLayer.appendChild(el); a.el=el; AE.anomalies.push(a); return a;
+}
+function spawnInitialAnomalies(){ if(AE.anomalies.length) return; for(let i=0;i<9;i++) createAnomaly(); }
+function anomalyEncounterData(a){
+  const map={
+    derelict:{icon:'🛸',title:'Дрейфующий корабль',text:'Экипаж обнаружил сильно повреждённое судно неизвестной цивилизации. Реактор нестабилен, но внутри сохранились рабочие секции.',choices:[['salvage','Разобрать на ресурсы','Надёжная добыча материалов.'],['techRisk','Попытаться восстановить ядро','Шанс получить археотехнологию, но корпус корабля может пострадать.']]},
+    ruins:{icon:'⌬',title:'Древние руины',text:'На безжизненном объекте найден комплекс, возраст которого значительно превышает известные колонии.',choices:[['tech','Исследовать центральный архив','Высокая вероятность уникальной технологии.'],['ksenit','Извлечь энергоячейки','Получить Ксенит без риска.']]},
+    rift:{icon:'◌',title:'Пространственный разлом',text:'Локальная аномалия искривляет пространство. Сенсоры фиксируют упорядоченный искусственный сигнал изнутри.',choices:[['riftTech','Стабилизировать разлом','Редкая технология и опыт, возможен урон корпусу.'],['ksenit','Снять показания и уйти','Безопасная научная награда.']]},
+    cache:{icon:'▣',title:'Скрытый контейнер',text:'В астероидной тени найден герметичный военный контейнер без опознавательных знаков.',choices:[['rareResources','Вскрыть контейнер','Редкие материалы для промышленности.'],['xp','Передать данные аналитикам','Опыт экипажа и Ксенит.']]},
+    life:{icon:'✿',title:'Неизвестная форма жизни',text:'Биосканер обнаружил устойчивую сложную экосистему и следы разумной активности.',choices:[['contact','Установить контакт','Колонисты и научные данные.'],['observe','Не вмешиваться','Безопасное наблюдение и опыт.']]},
+    wreckfield:{icon:'☄',title:'Поле обломков',text:'Здесь когда-то произошёл крупный бой. Среди обломков сохранились редкие сплавы и фрагменты вычислительных систем.',choices:[['rareResources','Организовать сбор','Редкие материалы.'],['tech','Исследовать бортовые системы','Шанс археотехнологии.']]},
+    beacon:{icon:'📡',title:'Древний маяк',text:'Маяк повторяет координатную последовательность и реагирует на сигнал корабля.',choices:[['reveal','Расшифровать карту сектора','Открывает большую область пространства.'],['commander','Передать сигнал флоту','Может привлечь талантливого офицера.']]},
+    prototype:{icon:'⚙',title:'Экспериментальный модуль',text:'Автоматическая лаборатория хранит прототип неизвестной системы корабельного класса.',choices:[['tech','Интегрировать прототип','Археотехнология.'],['xp','Изучить без подключения','Опыт экипажа и Ксенит.']]}
+  }; return map[a.type]||map.cache;
+}
+function remainingRareTechId(){
+  const remaining=Object.keys(RARE_TECHS).filter(id=>!AE.rareTechs.has(id));
+  return remaining.length ? remaining[Math.floor(Math.random()*remaining.length)] : null;
+}
+function remainingCommanderId(){
+  const remaining=Object.keys(COMMANDERS).filter(id=>!AE.unlockedCommanders.has(id));
+  return remaining.length ? remaining[Math.floor(Math.random()*remaining.length)] : null;
+}
+function prepareSignalLoot(a){
+  if(a.loot) return a.loot;
+  const loot={resources:{},ksenit:0,techId:null,commanderId:null,population:0,xp:22};
+  switch(a.type){
+    case 'derelict':
+      loot.resources={'Железо':160+randi(0,70),'Медь':90+randi(0,45),'Литий':35+randi(0,25)};
+      if(Math.random()<.42) loot.techId=remainingRareTechId();
+      break;
+    case 'ruins':
+      loot.techId=remainingRareTechId(); loot.ksenit=35+randi(0,25); loot.xp=38;
+      break;
+    case 'rift':
+      loot.techId=remainingRareTechId(); loot.ksenit=25+randi(0,25); loot.xp=45;
+      break;
+    case 'cache':
+      loot.resources={'Никель':45+randi(0,25),'Титан':24+randi(0,15),'Серебро':20+randi(0,12),'Платина':10+randi(0,8)};
+      break;
+    case 'life':
+      loot.ksenit=35+randi(0,25); loot.population=100+randi(0,90); loot.xp=35;
+      break;
+    case 'wreckfield':
+      loot.resources={'Железо':100+randi(0,80),'Никель':35+randi(0,22),'Титан':18+randi(0,14),'Серебро':14+randi(0,10)};
+      if(Math.random()<.30) loot.techId=remainingRareTechId();
+      break;
+    case 'beacon':
+      loot.ksenit=45+randi(0,30); loot.commanderId=remainingCommanderId(); loot.xp=30;
+      break;
+    case 'prototype':
+      loot.techId=remainingRareTechId(); loot.ksenit=20+randi(0,20); loot.xp=40;
+      break;
+    default:
+      loot.resources={'Железо':120,'Медь':70};
+  }
+  if(!loot.techId && ['ruins','rift','prototype'].includes(a.type)) loot.ksenit+=55;
+  if(!loot.commanderId && a.type==='beacon') loot.ksenit+=35;
+  a.loot=loot;
+  return loot;
+}
+function nearestPlayerColonyForSignal(ship){
+  let best=null,bestD=Infinity;
+  for(const p of planets){
+    if(p.owner!=='player') continue;
+    const d=Math.hypot(p.x-ship.x,p.y-ship.y);
+    if(d<bestD){bestD=d;best=p;}
+  }
+  return best || playerPlanet;
+}
+function signalLootRowsHtml(loot){
+  const rows=[];
+  Object.entries(loot.resources||{}).forEach(([r,n])=>rows.push('<div class="aeLootRow"><span>'+r+'</span><b>+'+Math.floor(n)+'</b></div>'));
+  if(loot.ksenit>0) rows.push('<div class="aeLootRow"><span>Ксенит</span><b>+'+Math.floor(loot.ksenit)+'</b></div>');
+  if(loot.techId){const t=RARE_TECHS[loot.techId];rows.push('<div class="aeLootRow tech"><span>'+t.icon+' Технология</span><b>'+t.name+'</b><small>'+t.desc+'</small></div>');}
+  if(loot.commanderId){const c=COMMANDERS[loot.commanderId];rows.push('<div class="aeLootRow tech"><span>'+c.icon+' Офицер</span><b>'+c.name+'</b><small>'+c.desc+'</small></div>');}
+  if(loot.population>0) rows.push('<div class="aeLootRow"><span>Спасённые колонисты</span><b>+'+Math.floor(loot.population)+'</b></div>');
+  return rows.join('') || '<div class="aeLootRow"><span>Научные данные</span><b>получены</b></div>';
+}
+function openSignalLootWindow(ship,a){
+  if(!ship || ship.destroyed || !a || a.resolved) return;
+  const d=anomalyEncounterData(a), loot=prepareSignalLoot(a), home=nearestPlayerColonyForSignal(ship);
+  AE.currentEncounter={ship,a,mode:'loot',home};
+  document.getElementById('aeEncounterIcon').textContent=d.icon;
+  document.getElementById('aeEncounterTitle').textContent=d.title;
+  document.getElementById('aeEncounterText').innerHTML=d.text+'<div class="aeLootTitle">Обнаружено</div><div class="aeLootList">'+signalLootRowsHtml(loot)+'</div><div class="aeLootRoute">После погрузки «'+ship.name+'» автоматически отправится к ближайшей колонии: <b>«'+home.name+'»</b>.</div>';
+  const box=document.getElementById('aeEncounterActions'); box.innerHTML='';
+  const take=document.createElement('button'); take.type='button'; take.className='aeTakeAllBtn'; take.innerHTML='Забрать всё и лететь на «'+home.name+'»<small>Награда поступит в империю после прибытия корабля.</small>';
+  take.addEventListener('click',()=>collectSignalLoot(ship,a,home)); box.appendChild(take);
+  const later=document.createElement('button'); later.type='button'; later.className='aeLaterBtn'; later.innerHTML='Осмотреть позже<small>Корабль останется у сигнала. Откройте его и нажмите «Осмотреть находку».</small>';
+  later.addEventListener('click',()=>document.getElementById('aeEncounterOverlay').classList.remove('open')); box.appendChild(later);
+  const leave=document.createElement('button'); leave.type='button'; leave.className='aeLaterBtn'; leave.innerHTML='Вернуться без находки<small>Сигнал останется на карте и позже к нему можно отправить другой корабль.</small>';
+  leave.addEventListener('click',()=>{
+    document.getElementById('aeEncounterOverlay').classList.remove('open');
+    releaseShipSignalAssignment(ship);
+    const fallback=home?.owner==='player'?home:nearestOwnedColonyToShip(ship);
+    if(fallback){ setScoutTarget(ship,fallback,{silent:true}); pushEvent(ship.name+' покинул неизвестный сигнал и возвращается на «'+fallback.name+'».','discovery'); }
+  }); box.appendChild(leave);
+  document.getElementById('aeEncounterOverlay').classList.add('open');
+}
+function collectSignalLoot(ship,a,home){
+  if(!ship || !a || a.resolved) return;
+  const loot=prepareSignalLoot(a);
+  ship._aeSignalDelivery={homePlanet:home,loot:{resources:{...(loot.resources||{})},ksenit:loot.ksenit||0,techId:loot.techId||null,commanderId:loot.commanderId||null,population:loot.population||0,xp:loot.xp||0},sourceTitle:anomalyEncounterData(a).title};
+  a.resolved=true; a.readyShipId=null; a.targetedBy=null; a._autoLootOpened=true; a._autoLootPending=false; a.el.classList.add('resolved'); a.el.classList.remove('targeted','ready');
+  ship._aeAnomalyTargetId=null; ship._aeAnomalyWaiting=false; ship.stationary=false;
+  AE.currentEncounter=null; document.getElementById('aeEncounterOverlay').classList.remove('open'); updateGalaxyBadge(); renderGalaxyPanel();
+  setScoutTarget(ship,home,{silent:true});
+  pushEvent(ship.name+' забрал находку и направился к ближайшей колонии «'+home.name+'».','resource');
+  showHint('Находка погружена. '+ship.name+' автоматически возвращается на «'+home.name+'».');
+}
+function deliverSignalLoot(ship,delivery){
+  if(!delivery) return;
+  const home=delivery.homePlanet?.owner==='player'?delivery.homePlanet:playerPlanet;
+  const loot=delivery.loot||{};
+  if(loot.resources) grantResources(home,loot.resources);
+  if(loot.ksenit>0) playerKsenit+=loot.ksenit;
+  if(loot.population>0) home.population=(home.population||0)+loot.population;
+  if(loot.techId){
+    if(!AE.rareTechs.has(loot.techId)){
+      AE.rareTechs.add(loot.techId); const t=RARE_TECHS[loot.techId];
+      pushEvent('ДОСТАВЛЕНА АРХЕОТЕХНОЛОГИЯ: '+t.name+' — '+t.desc,'success');
+    }else{ playerKsenit+=45; pushEvent('Повторные технологические данные преобразованы в 45 Ксенита.','resource'); }
+  }
+  if(loot.commanderId){
+    if(!AE.unlockedCommanders.has(loot.commanderId)){
+      AE.unlockedCommanders.add(loot.commanderId); const c=COMMANDERS[loot.commanderId];
+      pushEvent('На «'+home.name+'» прибыл новый офицер: '+c.name+'.','success');
+    }else playerKsenit+=30;
+  }
+  if(loot.xp>0) addShipXp(ship,loot.xp);
+  updateSelectedPlanetResourceBar(true); renderGalaxyPanel();
+  pushEvent(ship.name+' доставил находку с неизвестного сигнала на «'+home.name+'».','success');
+}
+function checkSignalDeliveries(){
+  scouts.filter(s=>s.owner==='player'&&s._aeSignalDelivery).forEach(s=>{
+    const d=s._aeSignalDelivery;
+    if(s.orbitPlanet===d.homePlanet && !s.targetPlanet){ deliverSignalLoot(s,d); s._aeSignalDelivery=null; }
+  });
+}
+function handleAnomalyTap(a){
+  if(a.resolved) return;
+  if(!a.discovered){ showHint('Сигнал ещё не обнаружен вашими сенсорами.'); return; }
+
+  if(a.readyShipId){
+    const arrived=scouts.find(s=>s.id===a.readyShipId && !s.destroyed);
+    if(arrived){ openSignalLootWindow(arrived,a); return; }
+    a.readyShipId=null; a.el.classList.remove('ready');
+  }
+
+  // Неизвестный сигнал может исследовать любой корабль игрока.
+  let candidates = [];
+  if(signalCommandShip) candidates = [signalCommandShip];
+  else if(selectedFleet.length) candidates = selectedFleet.filter(s=>s && s.owner==='player' && !s.destroyed);
+  else if(selectedScout) candidates = [selectedScout];
+
+  candidates = candidates.filter(s=>s && s.owner==='player' && !s.destroyed);
+  if(!candidates.length){
+    if(a.targetedBy){
+      const assigned=scouts.find(s=>s.id===a.targetedBy&&!s.destroyed);
+      if(assigned) showHint('К сигналу уже летит «'+assigned.name+'». Дождитесь прибытия.');
+      else showHint('Выберите любой свой корабль, нажмите «✦ К сигналу», затем нажмите на ?.');
+    }else showHint('Выберите любой свой корабль, нажмите «✦ К сигналу», затем нажмите на ?.');
+    return;
+  }
+  if(candidates.length > 1){ showHint('Для исследования неизвестного сигнала выберите один корабль.'); return; }
+
+  const s=candidates[0];
+  if(s.cooldownState || s.scanState){ showHint('Этот корабль пока не готов к новой экспедиции.'); return; }
+  if(s.resourceTransport){ showHint('Сначала завершите или отмените перевозку ресурсов.'); return; }
+  if(s.researchMining || s.planetMining){ showHint('Сначала отзовите корабль с добывающей операции.'); return; }
+  if(s._aeSignalDelivery){ showHint('Этот корабль уже везёт находку с другого сигнала.'); return; }
+
+  if(a.targetedBy && a.targetedBy !== s.id){
+    const assigned = scouts.find(x=>x.id===a.targetedBy && !x.destroyed);
+    if(assigned){ showHint('К этому сигналу уже направлен «'+assigned.name+'».'); return; }
+    a.targetedBy = null; a.el.classList.remove('targeted');
+  }
+  if(s._aeAnomalyTargetId && s._aeAnomalyTargetId !== a.id){
+    const old=AE.anomalies.find(x=>x.id===s._aeAnomalyTargetId);
+    if(old && old.targetedBy===s.id){ old.targetedBy=null; old.readyShipId=null; old.el?.classList.remove('targeted','ready'); }
+  }
+
+  if(s.orbitPlanet) s.lastDepartureTarget=s.orbitPlanet;
+  s.orbitPlanet=null; s.targetPlanet=null; s.targetPoint={x:a.x,y:a.y}; s.stationary=false;
+  s.autoPatrolPlanet=null; s.patrolState=null; s.combatTarget=null; clearWaypointMarker(s); removePatrolVisual(s);
+  s._aeAnomalyTargetId=a.id; s._aeAnomalyWaiting=false; a.targetedBy=s.id; a.el.classList.add('targeted');
+
+  signalCommandShip=null; pointCommandShips=[]; clearSelectedFleet(); clearScoutSelection();
+  pushEvent(s.name+' направлен к неизвестному сигналу.','discovery');
+}
+function showHint(textMsg){ scoutCommandHint.textContent=textMsg; scoutCommandHint.classList.add('show'); clearTimeout(showHint._t); showHint._t=setTimeout(()=>scoutCommandHint.classList.remove('show'),3000); }
+function openEncounter(ship,a){
+  if(!ship||!a||a.resolved) return; AE.currentEncounter={ship,a};
+  const d=anomalyEncounterData(a); document.getElementById('aeEncounterIcon').textContent=d.icon; document.getElementById('aeEncounterTitle').textContent=d.title; document.getElementById('aeEncounterText').textContent=d.text;
+  const box=document.getElementById('aeEncounterActions'); box.innerHTML=''; d.choices.forEach(([action,label,desc])=>{const b=document.createElement('button');b.type='button';b.innerHTML=label+'<small>'+desc+'</small>';b.addEventListener('click',()=>resolveEncounter(action));box.appendChild(b);}); document.getElementById('aeEncounterOverlay').classList.add('open');
+}
+function rewardHome(ship){ return ship.homePlanet?.owner==='player'?ship.homePlanet:(ship.lastDepartureTarget?.owner==='player'?ship.lastDepartureTarget:playerPlanet); }
+function grantResources(planet,table){ Object.entries(table).forEach(([r,n])=>addStock(planet,r,n)); if(resourceBarPlanet===planet) updateSelectedPlanetResourceBar(true); }
+function unlockRareTech(){
+  const remaining=Object.keys(RARE_TECHS).filter(id=>!AE.rareTechs.has(id));
+  if(!remaining.length){ playerKsenit+=55; pushEvent('Археоархив уже известен. Данные преобразованы в 55 Ксенита.','resource'); return null; }
+  const id=remaining[Math.floor(Math.random()*remaining.length)]; AE.rareTechs.add(id); const t=RARE_TECHS[id]; pushEvent('ОТКРЫТА АРХЕОТЕХНОЛОГИЯ: '+t.name+' — '+t.desc,'success'); renderGalaxyPanel(); return id;
+}
+function unlockRandomCommander(){
+  const remaining=Object.keys(COMMANDERS).filter(id=>!AE.unlockedCommanders.has(id));
+  if(!remaining.length){ playerKsenit+=30; pushEvent('Флотские кадры уже укомплектованы. Получено 30 Ксенита на обучение.','resource'); return null; }
+  const id=remaining[Math.floor(Math.random()*remaining.length)]; AE.unlockedCommanders.add(id); pushEvent('Новый офицер доступен: '+COMMANDERS[id].name+' — '+COMMANDERS[id].desc,'success'); renderGalaxyPanel(); return id;
+}
+function resolveEncounter(action){
+  const cur=AE.currentEncounter; if(!cur) return; const {ship,a}=cur, home=rewardHome(ship);
+  if(action==='salvage') grantResources(home,{'Железо':160,'Медь':90,'Литий':35});
+  else if(action==='techRisk'){ if(Math.random()<.38){ship.hp=Math.max(4,ship.hp-ship.maxHp*.22);pushEvent(ship.name+' повреждён при вскрытии древнего реактора.','attack');} unlockRareTech(); }
+  else if(action==='tech') unlockRareTech();
+  else if(action==='riftTech'){ if(Math.random()<.32){ship.hp=Math.max(4,ship.hp-ship.maxHp*.18);pushEvent('Разлом повредил корпус «'+ship.name+'».','attack');} unlockRareTech(); addShipXp(ship,25); }
+  else if(action==='ksenit'){ const n=35+randi(0,25); playerKsenit+=n; pushEvent('Экспедиция доставила '+n+' Ксенита.','resource'); }
+  else if(action==='rareResources'){ grantResources(home,{'Никель':45,'Титан':24,'Серебро':20,'Платина':10}); pushEvent('Редкие материалы доставлены на «'+home.name+'».','resource'); }
+  else if(action==='xp'){ addShipXp(ship,55); playerKsenit+=20; pushEvent('Экипаж получил опыт и 20 Ксенита.','success'); }
+  else if(action==='contact'){ home.population=(home.population||0)+120; playerKsenit+=25; pushEvent('Контакт успешен: +120 жителей на «'+home.name+'» и +25 Ксенита.','success'); }
+  else if(action==='observe'){ addShipXp(ship,40); playerKsenit+=30; pushEvent('Наблюдение завершено: +30 Ксенита.','success'); }
+  else if(action==='reveal'){ exploredAreas.push({x:a.x,y:a.y,r:520}); drawFog(true); pushEvent('Древняя карта раскрыла крупный сектор пространства.','discovery'); }
+  else if(action==='commander') unlockRandomCommander();
+  a.resolved=true;a.targetedBy=null;a.el.classList.add('resolved');a.el.classList.remove('targeted');ship._aeAnomalyTargetId=null;ship.stationary=true;addShipXp(ship,22);AE.currentEncounter=null;document.getElementById('aeEncounterOverlay').classList.remove('open');updateGalaxyBadge();renderGalaxyPanel();
+}
+
+// Сектора влияния.
+const influenceCanvas=document.createElement('canvas'); influenceCanvas.id='aeInfluenceCanvas'; influenceCanvas.width=800; influenceCanvas.height=650; world.insertBefore(influenceCanvas,planetLayer); const influenceCtx=influenceCanvas.getContext('2d');
+function drawInfluence(){
+  const ctx=influenceCtx,sx=800/WORLD_W,sy=650/WORLD_H;ctx.clearRect(0,0,800,650);
+  planets.forEach(p=>{
+    if(!['player','enemy'].includes(p.owner)) return;
+    if(p.owner==='enemy' && gameSettings.fog && !isPlanetDiscovered(p)) return;
+    const level=p.owner==='player'?getCivilizationLevel(p):Math.max(1,p.civilizationLevel||1); const radius=(205+level*35)*(p.specialization==='military'?1.10:1);
+    const gx=p.x*sx,gy=p.y*sy,gr=radius*sx; const color=p.owner==='player'?'77,169,255':'255,91,91'; const g=ctx.createRadialGradient(gx,gy,0,gx,gy,gr);g.addColorStop(0,'rgba('+color+',.18)');g.addColorStop(.72,'rgba('+color+',.075)');g.addColorStop(1,'rgba('+color+',0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(gx,gy,gr,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba('+color+',.20)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(gx,gy,gr*.82,0,Math.PI*2);ctx.stroke();
+  });
+}
+
+function sensorDistanceTo(enemy){
+  let best=Infinity;
+  scouts.filter(s=>s.owner==='player'&&!s.destroyed).forEach(s=>{let r=s.type==='scout'?430:230;const d=Math.hypot(s.x-enemy.x,s.y-enemy.y)-r;if(d<best)best=d;});
+  planets.filter(p=>p.owner==='player').forEach(p=>{const r=260+(p.buildings?.scienceCenter||0)*45+(p.buildings?.securityCenter||0)*25;const d=Math.hypot(p.x-enemy.x,p.y-enemy.y)-r;if(d<best)best=d;}); return best;
+}
+function intelForEnemy(ship){
+  const d=sensorDistanceTo(ship); if(d<=-80) return 3; if(d<=80) return 2; if(d<=230 || isExploredPoint(ship.x,ship.y)) return 1; return 0;
+}
+function visibleIntelContacts(){ return scouts.filter(s=>s.owner==='enemy'&&!s.destroyed).map(s=>({ship:s,level:intelForEnemy(s)})).filter(x=>x.level>0).sort((a,b)=>b.level-a.level).slice(0,12); }
+function nearbyThreatCheck(){
+  const colonies=planets.filter(p=>p.owner==='player');
+  scouts.filter(s=>s.owner==='enemy'&&!s.destroyed).forEach(s=>{
+    if(AE.alertedEnemyIds.has(s.id)) return;
+    const nearest=Math.min(...colonies.map(p=>Math.hypot(p.x-s.x,p.y-s.y)));
+    if(nearest<560 && intelForEnemy(s)>0){ AE.alertedEnemyIds.add(s.id); pushEvent('РАЗВЕДДАННЫЕ: обнаружено движение вражеского флота у ваших территорий. Состав уточняется.','detection'); }
+  });
+}
+
+function triggerDynamicEvent(){
+  const colonies=planets.filter(p=>p.owner==='player'); if(!colonies.length) return;
+  const p=colonies[Math.floor(Math.random()*colonies.length)]; const roll=Math.random();
+  if(roll<.16){ AE.solarStormUntil=gameElapsed+75; AE.activeEvents.push({name:'Солнечная буря',until:AE.solarStormUntil,desc:'Разведчики временно медленнее и хуже видят дальние цели.'}); pushEvent('КОСМИЧЕСКАЯ ПОГОДА: солнечная буря на 75 сек. Дальность и скорость разведчиков снижены.','detection'); }
+  else if(roll<.32){ p._aeMiningBoostUntil=gameElapsed+180; AE.activeEvents.push({name:'Богатая жила — '+p.name,until:p._aeMiningBoostUntil,desc:'+20% добычи на планете.'}); pushEvent('Геологи «'+p.name+'» нашли богатую жилу: +20% добычи на 180 сек.','resource'); }
+  else if(roll<.46){ p.population=(p.population||0)+randi(70,140); pushEvent('Миграционная волна: население «'+p.name+'» увеличилось.','success'); }
+  else if(roll<.60){ const n=randi(25,45);playerKsenit+=n;pushEvent('Научный прорыв: получено '+n+' Ксенита.','success'); }
+  else if(roll<.73){
+    if(p.shipQueue) p.shipQueue.remaining=Math.max(1,p.shipQueue.remaining-25); Object.values(p.buildingQueues||{}).forEach(q=>q.remaining=Math.max(1,q.remaining-18)); pushEvent('Промышленный импульс на «'+p.name+'»: текущие стройки заметно ускорены.','success');
+  }else if(roll<.86){
+    const ang=Math.random()*Math.PI*2,dist=rand(380,650); const ax=Math.max(140,Math.min(WORLD_W-140,p.x+Math.cos(ang)*dist)),ay=Math.max(180,Math.min(WORLD_H-180,p.y+Math.sin(ang)*dist)); const a=createAnomaly(ax,ay); if(a){a.discovered=true;a.el.classList.add('discovered');pushEvent('НЕИЗВЕСТНЫЙ СИГНАЛ появился недалеко от «'+p.name+'».','detection');}
+  }else unlockRandomCommander();
+  AE.nextEventAt=gameElapsed+rand(170,290); renderGalaxyPanel();updateGalaxyBadge();
+}
+
+// Улучшенный стратегический ИИ: выбирает более уязвимую колонию, атакует волной и умеет отступать.
+launchEnemyAttackWave=function(){
+  const profile=getAIProfile(); if(gameElapsed<profile.peaceTime||enemyAIState.attackCooldown>0) return false;
+  const development=enemyEconomyDevelopmentScore(); const economyReady=development.colonies.length>=2||development.mineLevels>=5; if(!economyReady&&gameElapsed<profile.peaceTime+240) return false;
+  const candidates=enemyAttackCandidates(); const defendersToKeep=Math.max(1,development.colonies.length); const available=Math.max(0,candidates.length-defendersToKeep); if(available<profile.attackFleetMin) return false;
+  const militaryBias=gameSettings.aiPersonality==='militarist'?1.35:gameSettings.aiPersonality==='economist'?.55:1; const chance=Math.min(.72,(.16+profile.aggression*.72)*militaryBias); if(Math.random()>=chance) return false;
+  const targets=planets.filter(p=>p.owner==='player'); if(!targets.length) return false;
+  const targetPlanet=targets.map(p=>{const defenders=fleetAtPlanet(p).filter(s=>s.owner==='player'&&isMilitaryShipType(s.type)).length;const defense=(p.buildings?.missileBattery||0)+(p.buildings?.laserBattery||0);const dist=Math.hypot(p.x-enemyPlanet.x,p.y-enemyPlanet.y);return {p,score:defenders*115+defense*155+dist*.03+(p===playerPlanet?80:0)};}).sort((a,b)=>a.score-b.score)[0].p;
+  const waveSize=Math.min(profile.attackWaveMax,available); const wave=candidates.slice().sort((a,b)=>Math.hypot(a.x-targetPlanet.x,a.y-targetPlanet.y)-Math.hypot(b.x-targetPlanet.x,b.y-targetPlanet.y)).slice(0,waveSize); const angle=Math.random()*Math.PI*2,dist=145+Math.random()*70,target={x:targetPlanet.x+Math.cos(angle)*dist,y:targetPlanet.y+Math.sin(angle)*dist};
+  wave.forEach(ship=>{ship.targetPlanet=null;ship.targetPoint={...target};ship.orbitPlanet=null;ship.researchMining=null;ship.combatTarget=null;ship.stationary=false;ship.patrolState=null;ship.autoPatrolPlanet=null;ship._aeAttackTargetPlanet=targetPlanet;removePatrolVisual(ship);}); enemyAIState.attackCooldown=profile.attackCooldown; if(!gameSettings.fog)pushEvent('Наблюдение: противник сформировал ударную группу из '+wave.length+' кораблей.','discovery'); return true;
+};
+const _enemyAIThink=enemyAIThink;
+enemyAIThink=function(){
+  _enemyAIThink();
+  const profile=getAIProfile();
+  planets.filter(p=>p.owner==='enemy').forEach((p,idx)=>{
+    if(!p.specialization) p.specialization=idx%3===0?'mining':idx%3===1?'industrial':'military';
+    if(Object.keys(p.buildingQueues||{}).length) return;
+    const priorities=[]; if((p.buildings.foodFarm||0)<2)priorities.push('foodFarm'); if((p.buildings.waterPlant||0)<2)priorities.push('waterPlant'); if((p.buildings.habitat||0)<2)priorities.push('habitat'); if(gameElapsed>profile.peaceTime*.45&&(p.buildings.scienceCenter||0)<1)priorities.push('scienceCenter'); if(gameElapsed>profile.peaceTime*.75&&(p.buildings.missileBattery||0)<1)priorities.push('missileBattery');
+    for(const t of priorities){if(aiStartBuilding(p,t))break;}
+  });
+};
+const _enemyColonizePlanet=enemyColonizePlanet;
+enemyColonizePlanet=function(ship,planet){const ok=_enemyColonizePlanet(ship,planet);if(ok){planet.specialization=['mining','industrial','military'][Math.floor(Math.random()*3)];drawInfluence();}return ok;};
+
+function updateAIRetreats(){
+  const homes=planets.filter(p=>p.owner==='enemy'); if(!homes.length)return;
+  scouts.filter(s=>s.owner==='enemy'&&isMilitaryShipType(s.type)&&!s.destroyed&&!s._aeRetreating&&(s.hp||0)<(s.maxHp||1)*.22).forEach(s=>{
+    const home=homes.slice().sort((a,b)=>Math.hypot(a.x-s.x,a.y-s.y)-Math.hypot(b.x-s.x,b.y-s.y))[0]; if(!home)return; const old=s.combatTarget;if(old?.combatTarget===s)old.combatTarget=null;s.combatTarget=null;s.patrolState=null;s.autoPatrolPlanet=null;s.targetPoint=null;s.targetPlanet=home;s.orbitPlanet=null;s.stationary=false;s._aeRetreating=true;removePatrolVisual(s);
+  });
+  scouts.filter(s=>s.owner==='enemy'&&s._aeRetreating&&s.orbitPlanet?.owner==='enemy').forEach(s=>{s._aeRetreating=false;enableEnemyPatrolQuiet(s,s.orbitPlanet);});
+}
+
+function renderGalaxyPanel(){
+  const content=document.getElementById('aeGalaxyContent'); if(!content)return;
+  const activeAn=AE.anomalies.filter(a=>a.discovered&&!a.resolved); const techs=Object.entries(RARE_TECHS); const contacts=gameStarted?visibleIntelContacts():[];
+  const eventHtml=AE.activeEvents.filter(e=>e.until>gameElapsed).map(e=>'<div class="aeEventLine"><b>'+e.name+'</b><br><span>'+e.desc+' • ещё '+Math.ceil(e.until-gameElapsed)+' сек.</span></div>').join('');
+  content.innerHTML='<div class="aeSection"><div class="aeSectionTitle">✦ Неизвестные сигналы</div><div class="aeMuted">Обнаружено активных: <b>'+activeAn.length+'</b> • всего исследовано: <b>'+AE.anomalies.filter(a=>a.resolved).length+'</b>. Откройте любой свой корабль, нажмите <b>✦ К сигналу</b>, затем нажмите на знак <b>?</b>.</div>'+activeAn.slice(0,6).map(a=>'<span class="aeChip">? сектор '+Math.round(a.x/100)+'-'+Math.round(a.y/100)+'</span>').join('')+'</div>'+
+  '<div class="aeSection"><div class="aeSectionTitle">⌬ Археотехнологии</div><div class="aeGrid">'+techs.map(([id,t])=>'<div class="aeCard '+(AE.rareTechs.has(id)?'':'locked')+'"><b>'+t.icon+' '+t.name+'</b><small>'+(AE.rareTechs.has(id)?t.desc:'Неизвестно • найдите в аномалии')+'</small></div>').join('')+'</div></div>'+
+  '<div class="aeSection"><div class="aeSectionTitle">🎖 Командиры</div><div class="aeGrid">'+Object.entries(COMMANDERS).map(([id,c])=>'<div class="aeCard '+(AE.unlockedCommanders.has(id)?'':'locked')+'"><b>'+c.icon+' '+(AE.unlockedCommanders.has(id)?c.name:'Неизвестный офицер')+'</b><small>'+(AE.unlockedCommanders.has(id)?c.desc:'Может появиться во время экспедиции или события.')+'</small></div>').join('')+'</div><div class="aeMuted" style="margin-top:8px">Назначение командира выполняется в меню групп флота.</div></div>'+
+  '<div class="aeSection"><div class="aeSectionTitle">📡 Разведданные о противнике</div>'+(contacts.length?contacts.map(({ship,level})=>{const approx=isMilitaryShipType(ship.type)?(ship.type==='cruiser'||ship.type==='battleship'||ship.type==='dreadnought'||ship.type==='titan'?'тяжёлый корабль':'боевой корабль'):'небоевой объект';const main=level>=3?ship.name:(level===2?(SHIP_DEFS[ship.type]?.name||approx):'Неизвестный '+approx);const detail=level>=3?'Корпус '+Math.ceil(ship.hp)+'/'+Math.ceil(ship.maxHp)+' • '+shipStatusText(ship):(level===2?'Тип определён, параметры уточняются.':'Слабый контакт • точный состав неизвестен.');return '<div class="aeIntelRow"><div class="aeIntelMain"><b>'+main+'</b><small>'+detail+'</small></div><div class="aeIntelLevel">'+(level===3?'ТОЧНО':level===2?'ОЦЕНКА':'СИГНАЛ')+'</div></div>';}).join(''):'<div class="aeMuted">Поблизости нет обнаруженных вражеских контактов.</div>')+'</div>'+
+  '<div class="aeSection"><div class="aeSectionTitle">☄ События галактики</div>'+(eventHtml||'<div class="aeMuted">Сейчас нет активных глобальных событий.</div>')+'</div>';
+}
+function updateGalaxyBadge(){const n=AE.anomalies.filter(a=>a.discovered&&!a.resolved).length;const b=document.getElementById('aeGalaxyBadge');if(!b)return;b.textContent=n;b.style.display=n?'block':'none';}
+const galaxyOverlay=document.getElementById('aeGalaxyOverlay');document.getElementById('aeGalaxyButton').addEventListener('click',()=>{renderGalaxyPanel();galaxyOverlay.classList.add('open');});document.getElementById('aeGalaxyClose').addEventListener('click',()=>galaxyOverlay.classList.remove('open'));galaxyOverlay.addEventListener('pointerdown',e=>{if(e.target===galaxyOverlay)galaxyOverlay.classList.remove('open');else e.stopPropagation();});document.getElementById('aeEncounterOverlay').addEventListener('pointerdown',e=>e.stopPropagation());
+
+function discoverAnomalies(){
+  AE.anomalies.forEach(a=>{if(a.resolved||a.discovered)return;let found=isExploredPoint(a.x,a.y);if(!found){found=scouts.some(s=>s.owner==='player'&&s.type==='scout'&&Math.hypot(s.x-a.x,s.y-a.y)<360);}if(found){a.discovered=true;a.el.classList.add('discovered');pushEvent('НЕИЗВЕСТНЫЙ СИГНАЛ обнаружен в исследованном секторе.','detection');}}); updateGalaxyBadge();
+}
+function signalLootAutoOpenBlocked(){
+  const blockingIds=['aeTutorialOverlay','planetInfoOverlay','planetFleetOverlay','shipControlOverlay','aeBoardingOverlay','aePlanetNavigatorOverlay','aeGalaxyOverlay'];
+  if(blockingIds.some(id=>document.getElementById(id)?.classList.contains('open'))) return true;
+  return !!(mainMenu && mainMenu.style.display && mainMenu.style.display!=='none');
+}
+function scheduleSignalLootAutoOpen(s,a){
+  if(!s||!a||a.resolved||a.readyShipId!==s.id||s.destroyed||a._autoLootOpened) return;
+  if(signalLootAutoOpenBlocked()){ a._autoLootPending=true; return; }
+  a._autoLootPending=false;
+  a._autoLootOpened=true;
+  setTimeout(()=>{
+    if(a.resolved||a.readyShipId!==s.id||s.destroyed) return;
+    if(signalLootAutoOpenBlocked()){
+      a._autoLootOpened=false;
+      a._autoLootPending=true;
+      return;
+    }
+    openSignalLootWindow(s,a);
+  },180);
+}
+function checkAnomalyArrivals(){
+  scouts.filter(s=>s.owner==='player'&&s._aeAnomalyTargetId).forEach(s=>{
+    const a=AE.anomalies.find(x=>x.id===s._aeAnomalyTargetId);
+    if(!a||a.resolved){s._aeAnomalyTargetId=null;s._aeAnomalyWaiting=false;return;}
+    if(!s.targetPoint||Math.hypot(s.x-a.x,s.y-a.y)<9){
+      s.x=a.x;s.y=a.y;s.targetPoint=null;s.stationary=true;
+      if(a.readyShipId!==s.id){
+        a.readyShipId=s.id; a.targetedBy=s.id; s._aeAnomalyWaiting=true; prepareSignalLoot(a);
+        a._autoLootOpened=false; a._autoLootPending=true;
+        a.el.classList.add('ready','targeted');
+        a.el.innerHTML='!<span class="aeAnomalyLabel">НАХОДКА ОБНАРУЖЕНА</span>';
+        pushEvent(s.name+' достиг неизвестного сигнала. Находка готова к осмотру.','success');
+        showHint('Экспедиция прибыла: находку можно открыть через знак ! или меню корабля.');
+      }
+      if(s._aeAnomalyWaiting && !a._autoLootOpened) scheduleSignalLootAutoOpen(s,a);
+    }
+  });
+}
+function featureTick(){
+  if(gameStarted && !AE.gameInitialized){AE.gameInitialized=true;AE.lastGameElapsed=gameElapsed;AE.nextEventAt=gameElapsed+rand(150,230);spawnInitialAnomalies();scouts.forEach(s=>enhanceShip(s,s.orbitPlanet));drawInfluence();pushEvent('Галактика активна: обнаруживайте аномалии, развивайте специализации и собирайте опыт экипажей.','discovery');}
+  if(gameStarted){
+    const dt=Math.max(0,gameElapsed-AE.lastGameElapsed);AE.lastGameElapsed=gameElapsed;
+    if(dt>0){
+      planets.filter(p=>p.owner==='player'&&p.specialization==='industrial').forEach(p=>{if(p.shipQueue)p.shipQueue.remaining-=dt*.20;Object.values(p.buildingQueues||{}).forEach(q=>q.remaining-=dt*.10);});
+      if(gameElapsed>=AE.nextEventAt)triggerDynamicEvent();AE.activeEvents=AE.activeEvents.filter(e=>e.until>gameElapsed);
+    }
+    const now=performance.now();if(now-AE.lastDiscoveryCheck>500){AE.lastDiscoveryCheck=now;discoverAnomalies();nearbyThreatCheck();updateAIRetreats();checkAnomalyArrivals();checkSignalDeliveries();if(galaxyOverlay.classList.contains('open'))renderGalaxyPanel();}
+    if(now-AE.lastInfluenceDraw>2200){AE.lastInfluenceDraw=now;drawInfluence();}
+  }
+}
+AE.tick=featureTick;
+AE.renderGalaxyPanel=renderGalaxyPanel;
+AE.commanders=COMMANDERS;
+AE.openSignalForShip=function(ship){
+  if(!ship || ship.destroyed) return false;
+  const a=AE.anomalies.find(x=>x.id===ship._aeAnomalyTargetId && !x.resolved);
+  if(!a || a.readyShipId!==ship.id){ showHint('Этот корабль ещё не завершил экспедицию к сигналу.'); return false; }
+  openSignalLootWindow(ship,a); return true;
+};
+AE.initialized=true;renderGalaxyPanel();drawInfluence();
+})();
+</script>
+
+
+<style id="aePlanetNavigatorStyles">
+#aePlanetNavigatorButton{position:fixed;left:180px;bottom:18px;z-index:213;width:48px;height:48px;border-radius:14px;border:1px solid rgba(108,224,171,.40);background:linear-gradient(180deg,rgba(13,54,48,.96),rgba(5,27,27,.96));color:#eafff6;font-size:21px;font-weight:900;box-shadow:0 5px 20px rgba(0,0,0,.40),0 0 16px rgba(69,219,153,.10);touch-action:manipulation}
+#aePlanetNavigatorButton:active{transform:scale(.97)}
+#aePlanetNavigatorOverlay{position:fixed;inset:0;z-index:545;display:none;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;background:rgba(0,3,10,.58);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+#aePlanetNavigatorOverlay.open{display:flex}.aePlanetNavPanel{width:min(100%,520px);max-height:88vh;overflow:auto;border-radius:22px;padding:17px;box-sizing:border-box;border:1px solid rgba(117,225,183,.27);background:radial-gradient(circle at 18% 0%,rgba(66,211,169,.10),transparent 36%),linear-gradient(180deg,rgba(7,25,31,.99),rgba(4,11,22,.995));box-shadow:0 26px 75px rgba(0,0,0,.72);color:#eafff7}.aePlanetNavHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.aePlanetNavTitle{font-size:21px;font-weight:950}.aePlanetNavSub{margin-top:3px;font-size:11px;color:#96b8b3}.aePlanetNavClose{width:38px;height:38px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:21px}.aePlanetNavSection{margin-top:14px}.aePlanetNavSectionTitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#a5f2d4}.aePlanetNavList{display:grid;gap:7px}.aePlanetNavItem{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;border-radius:12px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.045);color:#eefdf8;text-align:left;touch-action:manipulation}.aePlanetNavItem:active{transform:scale(.99)}.aePlanetNavMain{min-width:0}.aePlanetNavMain b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.aePlanetNavMain small{display:block;margin-top:3px;color:#91aaa8;font-size:10px;line-height:1.3}.aePlanetNavGo{flex:0 0 auto;color:#77e2bc;font-size:18px}.aePlanetNavEmpty{padding:10px;border-radius:11px;background:rgba(255,255,255,.03);color:#809995;font-size:11px}.aeNavPulse{position:absolute;z-index:80;width:86px;height:86px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;border:2px solid rgba(121,255,194,.95);box-shadow:0 0 16px rgba(112,255,201,.7),inset 0 0 14px rgba(112,255,201,.24);animation:aeNavPulseAnim 1.3s ease-out forwards}@keyframes aeNavPulseAnim{0%{opacity:1;transform:translate(-50%,-50%) scale(.45)}70%{opacity:.8}100%{opacity:0;transform:translate(-50%,-50%) scale(1.65)}}
+@media(max-width:520px){#aePlanetNavigatorButton{left:180px}.aePlanetNavPanel{max-height:91vh}}
+</style>
+<button id="aePlanetNavigatorButton" type="button" title="Планеты и добыча">◉</button>
+<div id="aePlanetNavigatorOverlay"><div class="aePlanetNavPanel"><div class="aePlanetNavHead"><div><div class="aePlanetNavTitle">Планеты</div><div class="aePlanetNavSub">быстрый переход к колониям и точкам добычи</div></div><button id="aePlanetNavClose" class="aePlanetNavClose" type="button">×</button></div><div id="aePlanetNavContent"></div></div></div>
+<script id="aePlanetNavigatorAndTapFixes">
+(function(){
+'use strict';
+let planetCardOpenedAt=0;
+let managePressArmed=false;
+
+// Дополнительная защита от сквозного тапа: кнопка «Управление планетой»
+// принимает click только после отдельного нового pointerdown.
+const previousOpenPlanetInfo=openPlanetInfo;
+openPlanetInfo=function(planet){
+  planetCardOpenedAt=performance.now();
+  managePressArmed=false;
+  return previousOpenPlanetInfo(planet);
+};
+planetManageBtn.addEventListener('pointerdown',e=>{
+  if(performance.now()-planetCardOpenedAt<520){
+    managePressArmed=false; e.preventDefault(); e.stopImmediatePropagation(); return;
+  }
+  managePressArmed=true;
+},true);
+planetManageBtn.addEventListener('click',e=>{
+  if(!managePressArmed){ e.preventDefault(); e.stopImmediatePropagation(); return; }
+  managePressArmed=false;
+},true);
+
+function priorityPlanetAtScreenPoint(clientX,clientY){
+  const pt=screenToWorldPoint(clientX,clientY);
+  let best=null,bestD=Infinity;
+  for(const p of planets){
+    if(!isPlanetDiscovered(p)) continue;
+    const d=Math.hypot(pt.x-p.x,pt.y-p.y);
+    const bodyRadius=Math.max(16,p.r*.62);
+    if(d<=bodyRadius && d<bestD){best=p;bestD=d;}
+  }
+  return best;
+}
+function handlePriorityPlanetTap(p){
+  if(selectedFleet.length){ sendSelectedFleetToPlanet(p); return; }
+  if(selectedScout && selectedScout.owner==='player'){
+    if(selectedScout.orbitPlanet===p){ clearScoutSelection(); openPlanetInfo(p); return; }
+    if(!canScoutTargetPlanet(selectedScout,p)){ showHint('Планета слишком далеко от текущей зоны разведки. Сначала исследуйте более близкую систему.'); return; }
+    setScoutTarget(selectedScout,p); return;
+  }
+  openPlanetInfo(p);
+}
+// Если корабль визуально перекрывает сам диск планеты, приоритет получает планета.
+viewport.addEventListener('pointerdown',e=>{
+  if(e.target.closest?.('.aeAnomaly')) return;
+  const shipEl=e.target.closest?.('.scout');
+  if(!shipEl || !gameStarted) return;
+  const p=priorityPlanetAtScreenPoint(e.clientX,e.clientY);
+  if(!p) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  handlePriorityPlanetTap(p);
+},true);
+
+function focusWorldObject(obj){
+  if(!obj) return;
+  x=innerWidth/2-obj.x*scale;
+  y=innerHeight/2-obj.y*scale;
+  render();
+  if(typeof updateWorldCulling==='function') updateWorldCulling(true);
+  const pulse=document.createElement('div'); pulse.className='aeNavPulse'; pulse.style.left=obj.x+'px'; pulse.style.top=obj.y+'px'; world.appendChild(pulse); setTimeout(()=>pulse.remove(),1400);
+  showHint('Камера перемещена к «'+(obj.name||'объекту')+'».');
+}
+function miningEntries(){
+  const entries=[];
+  planets.filter(p=>p.owner==='player').forEach(p=>{
+    let levels=0;
+    try{ levels=totalMiningStationLevels(p); }catch(err){}
+    if(levels>0) entries.push({obj:p,title:p.name,sub:'Колония • добывающие станции: '+levels,sort:0});
+  });
+  planets.filter(p=>p.owner==='neutral'&&!p.habitable).forEach(p=>{
+    const miners=scouts.filter(s=>s.owner==='player'&&s.planetMining?.planet?.id===p.id&&!s.destroyed).length;
+    if(miners>0){
+      let left=0; try{left=Math.floor(planetExtractionRemaining(p));}catch(err){}
+      entries.push({obj:p,title:p.name,sub:'Удалённая добыча • грузовых кораблей: '+miners+' • остаток: '+left,sort:1});
+    }
+  });
+  researchAsteroids.forEach(a=>{
+    const miners=scouts.filter(s=>s.owner==='player'&&s.researchMining?.asteroid?.id===a.id&&!s.destroyed).length;
+    if(miners>0) entries.push({obj:a,title:a.name,sub:'Добыча Ксенита • кораблей: '+miners+' • запас: '+Math.max(0,Math.floor(a.reserve||0)),sort:2});
+  });
+  return entries.sort((a,b)=>a.sort-b.sort||a.title.localeCompare(b.title,'ru'));
+}
+function navItemHtml(id,title,sub){
+  return '<button class="aePlanetNavItem" type="button" data-ae-nav-id="'+id+'"><span class="aePlanetNavMain"><b>'+title+'</b><small>'+sub+'</small></span><span class="aePlanetNavGo">›</span></button>';
+}
+function renderPlanetNavigator(){
+  const content=document.getElementById('aePlanetNavContent'); if(!content) return;
+  const colonies=planets.filter(p=>p.owner==='player');
+  const mining=miningEntries();
+  const colonyHtml=colonies.length?colonies.map(p=>{
+    let spec=''; try{spec=p.specialization&&SPECIALIZATIONS[p.specialization]?SPECIALIZATIONS[p.specialization].name:'';}catch(err){}
+    return navItemHtml('planet:'+p.id,p.name,(p===playerPlanet?'Стартовая колония':'Колония')+(spec?' • '+spec:''));
+  }).join(''):'<div class="aePlanetNavEmpty">Колоний пока нет.</div>';
+  const miningHtml=mining.length?mining.map((m,i)=>navItemHtml('mining:'+i,m.title,m.sub)).join(''):'<div class="aePlanetNavEmpty">Активной добычи сейчас нет.</div>';
+  content.innerHTML='<div class="aePlanetNavSection"><div class="aePlanetNavSectionTitle"><span>🌍 Колонии</span><span>'+colonies.length+'</span></div><div class="aePlanetNavList">'+colonyHtml+'</div></div><div class="aePlanetNavSection"><div class="aePlanetNavSectionTitle"><span>⛏ Добыча</span><span>'+mining.length+'</span></div><div class="aePlanetNavList">'+miningHtml+'</div></div>';
+  content._miningEntries=mining;
+  content.querySelectorAll('[data-ae-nav-id]').forEach(btn=>btn.addEventListener('click',e=>{
+    e.preventDefault();e.stopPropagation();
+    const key=btn.dataset.aeNavId;
+    let obj=null;
+    if(key.startsWith('planet:')) obj=planets.find(p=>p.id===key.slice(7));
+    else if(key.startsWith('mining:')) obj=content._miningEntries[Number(key.slice(7))]?.obj;
+    if(!obj) return;
+    navOverlay.classList.remove('open'); focusWorldObject(obj);
+  }));
+}
+const navOverlay=document.getElementById('aePlanetNavigatorOverlay');
+document.getElementById('aePlanetNavigatorButton').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();renderPlanetNavigator();navOverlay.classList.add('open');});
+document.getElementById('aePlanetNavClose').addEventListener('click',()=>navOverlay.classList.remove('open'));
+navOverlay.addEventListener('pointerdown',e=>{if(e.target===navOverlay)navOverlay.classList.remove('open');else e.stopPropagation();});
+})();
+</script>
+
+<style id="aeCaptureDefenseTutorialStyles">
+#aeTutorialOverlay{position:fixed;inset:0;z-index:980;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;background:rgba(0,3,10,.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#aeTutorialOverlay.open{display:flex}.aeTutorialCard{width:min(100%,500px);border-radius:22px;padding:20px;box-sizing:border-box;color:#effaff;background:radial-gradient(circle at 18% 0%,rgba(65,194,255,.15),transparent 38%),linear-gradient(180deg,rgba(8,23,43,.995),rgba(3,10,23,.995));border:1px solid rgba(110,218,255,.28);box-shadow:0 28px 80px rgba(0,0,0,.76),0 0 36px rgba(66,176,255,.08)}
+.aeTutorialTop{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.aeTutorialKicker{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#7edfff;font-weight:900}.aeTutorialTitle{font-size:24px;font-weight:950;margin-top:4px}.aeTutorialIcon{font-size:42px;line-height:1}.aeTutorialText{margin-top:14px;font-size:13px;line-height:1.55;color:#bed0df}.aeTutorialText b{color:#fff}.aeTutorialText .goal{display:block;margin-top:10px;padding:10px 11px;border-radius:12px;border:1px solid rgba(100,218,255,.15);background:rgba(65,171,220,.08);color:#dff8ff}.aeTutorialDots{display:flex;gap:5px;margin-top:16px}.aeTutorialDot{height:5px;flex:1;border-radius:999px;background:rgba(255,255,255,.10)}.aeTutorialDot.active{background:#79ddff;box-shadow:0 0 10px rgba(121,221,255,.4)}.aeTutorialActions{display:grid;grid-template-columns:auto 1fr auto;gap:8px;margin-top:15px}.aeTutorialBtn{min-height:42px;padding:0 14px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.055);color:#dcebf5;font-weight:850}.aeTutorialBtn.primary{border-color:rgba(87,224,255,.35);background:linear-gradient(180deg,rgba(32,149,190,.30),rgba(12,72,104,.36));color:#efffff}.aeTutorialBtn.skip{opacity:.76}.aeTutorialBtn:disabled{opacity:.28}.aeDefenseOverview{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:9px 0 11px}.aeDefenseMetric{padding:10px;border-radius:11px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.075)}.aeDefenseMetric b{display:block;font-size:15px;color:#effcff}.aeDefenseMetric small{display:block;margin-top:3px;font-size:9px;color:#91a9bb;line-height:1.35}.aeDefenseBar{height:7px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin:8px 0 4px}.aeDefenseBar>i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#54d6bd,#7bdcff);box-shadow:0 0 10px rgba(91,224,207,.32)}.aeDefenseHow{display:grid;gap:7px;margin:10px 0}.aeDefenseStep{display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:start;padding:8px 9px;border-radius:10px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);font-size:10px;line-height:1.4;color:#aabcca}.aeDefenseStep span{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(91,209,255,.12);border:1px solid rgba(91,209,255,.20);color:#bcefff;font-weight:950}.aeCaptureLive{margin-top:10px;padding:10px;border-radius:11px;border:1px solid rgba(255,177,93,.22);background:rgba(143,80,28,.10)}.aeCaptureLive.paused{border-color:rgba(255,221,113,.18);background:rgba(120,103,32,.08)}.aeCaptureLive b{font-size:11px;color:#ffe0a8}.aeCaptureLive small{display:block;margin-top:4px;color:#b9a98d;font-size:9px;line-height:1.4}.aeSiegeBadge{position:absolute;z-index:54;transform:translate(-50%,-50%);pointer-events:none;min-width:76px;padding:5px 8px;border-radius:999px;text-align:center;font-size:9px;font-weight:950;letter-spacing:.25px;color:#fff7de;background:rgba(98,43,22,.90);border:1px solid rgba(255,160,92,.55);box-shadow:0 0 16px rgba(255,104,56,.25);white-space:nowrap}.aeSiegeBadge.player{background:rgba(18,68,96,.92);border-color:rgba(91,210,255,.58);box-shadow:0 0 16px rgba(68,193,255,.25)}.aePlanetDefenseFlash{position:absolute;z-index:53;pointer-events:none;width:34px;height:34px;border-radius:50%;transform:translate(-50%,-50%);border:2px solid rgba(255,190,95,.9);box-shadow:0 0 22px rgba(255,135,55,.65);animation:aePlanetDefenseFlash .35s ease-out forwards}@keyframes aePlanetDefenseFlash{from{opacity:1;transform:translate(-50%,-50%) scale(.45)}to{opacity:0;transform:translate(-50%,-50%) scale(1.8)}}
+@media(max-width:520px){.aeTutorialCard{padding:17px}.aeTutorialTitle{font-size:21px}.aeDefenseOverview{grid-template-columns:1fr 1fr}.aeTutorialActions{grid-template-columns:auto 1fr auto}}
+</style>
+<div id="aeTutorialOverlay" aria-hidden="true"><div class="aeTutorialCard"><div class="aeTutorialTop"><div><div class="aeTutorialKicker" id="aeTutorialKicker"></div><div class="aeTutorialTitle" id="aeTutorialTitle"></div></div><div class="aeTutorialIcon" id="aeTutorialIcon">🚀</div></div><div class="aeTutorialText" id="aeTutorialText"></div><div class="aeTutorialDots" id="aeTutorialDots"></div><div class="aeTutorialActions"><button class="aeTutorialBtn" id="aeTutorialBack" type="button">Назад</button><button class="aeTutorialBtn skip" id="aeTutorialSkip" type="button">Пропустить</button><button class="aeTutorialBtn primary" id="aeTutorialNext" type="button">Далее</button></div></div></div>
+<script id="aeCaptureDefenseTutorialScript">
+(()=>{
+const CAPTURE_TIME=180;
+const SIEGE_RADIUS=138;
+const CAPTURE_RADIUS=122;
+const DEFENSE_RULES={
+  missile:{building:'missileBattery',name:'Ракетная батарея',hpPer:240,damage:10,interval:2.2,range:126,weaponType:'destroyer'},
+  laser:{building:'laserBattery',name:'Лазерная установка',hpPer:360,damage:17,interval:1.6,range:140,weaponType:'cruiser'}
+};
+
+try{
+  if(BUILDING_DEFS?.missileBattery) BUILDING_DEFS.missileBattery.desc='Автоматически обстреливает вражеские боевые корабли у планеты. 240 прочности на установку • 10 урона каждые 2,2 сек.';
+  if(BUILDING_DEFS?.laserBattery) BUILDING_DEFS.laserBattery.desc='Тяжёлая автоматическая оборона орбиты. 360 прочности на установку • 17 урона каждые 1,6 сек.';
+}catch(err){}
+
+function ownerEnemy(owner){ return owner==='player'?'enemy':'player'; }
+function militaryNearPlanet(planet,owner,radius=SIEGE_RADIUS){
+  return scouts.filter(s=>!s.destroyed&&s.owner===owner&&isMilitaryShipType(s.type)&&Math.hypot(s.x-planet.x,s.y-planet.y)<=radius);
+}
+function siegeShipsForPlanet(planet,owner){
+  return militaryNearPlanet(planet,owner,SIEGE_RADIUS).filter(s=>s._aeSiegePlanet===planet||s.orbitPlanet===planet||s.combatTarget);
+}
+function syncDefenseState(planet){
+  if(!planet) return null;
+  const s=planet._aeDefenseState||(planet._aeDefenseState={missileHp:0,laserHp:0,missileCount:null,laserCount:null,missileCooldown:0,laserCooldown:0});
+  for(const [kind,cfg] of Object.entries(DEFENSE_RULES)){
+    const hpKey=kind+'Hp', countKey=kind+'Count';
+    const count=Math.max(0,Math.floor(planet.buildings?.[cfg.building]||0));
+    if(s[countKey]===null || s[countKey]===undefined){
+      s[countKey]=count; s[hpKey]=count*cfg.hpPer;
+    }else if(count>s[countKey]){
+      s[hpKey]+= (count-s[countKey])*cfg.hpPer; s[countKey]=count;
+    }else if(count<s[countKey]){
+      s[countKey]=count; s[hpKey]=Math.min(s[hpKey],count*cfg.hpPer);
+    }
+    const max=count*cfg.hpPer;
+    s[hpKey]=Math.max(0,Math.min(max,Number(s[hpKey]||0)));
+  }
+  return s;
+}
+function defenseTotals(planet){
+  const s=syncDefenseState(planet);
+  const missileCount=Math.max(0,planet.buildings?.missileBattery||0), laserCount=Math.max(0,planet.buildings?.laserBattery||0);
+  const max=missileCount*DEFENSE_RULES.missile.hpPer+laserCount*DEFENSE_RULES.laser.hpPer;
+  const hp=Math.max(0,(s?.missileHp||0)+(s?.laserHp||0));
+  return {s,hp,max,missileCount,laserCount,pct:max?Math.round(hp/max*100):0};
+}
+function planetDefenseAlive(planet){ const d=defenseTotals(planet); return d.hp>0&&d.max>0; }
+function effectiveSiegeDamage(ship){
+  let dmg=Math.max(1,Number(ship?.damage||2));
+  if(ship?.owner==='enemy'){
+    try{dmg*=getAIProfile().combat||1;}catch(err){}
+  }else if(ship?.owner==='player'){
+    try{dmg*=1+Math.max(0,(shipLevel(ship)-1)*.05)+(ship._aeMilitaryDamage||0);}catch(err){}
+    try{const c=commanderForShip(ship); if(c?.damage)dmg*=1+c.damage;}catch(err){}
+  }
+  return dmg*.78;
+}
+function planetImpactTarget(planet){ return {x:planet.x,y:planet.y,destroyed:false,owner:planet.owner}; }
+function flashPlanetDefense(planet){
+  if(!planetLayer||!planet) return;
+  const el=document.createElement('div'); el.className='aePlanetDefenseFlash'; el.style.left=planet.x+'px'; el.style.top=planet.y+'px'; planetLayer.appendChild(el); setTimeout(()=>el.remove(),420);
+}
+function damagePlanetDefense(planet,amount,attacker){
+  if(!planet||amount<=0) return false;
+  const s=syncDefenseState(planet); if(!s) return false;
+  const beforeTotal=defenseTotals(planet).hp;
+  let kind=s.laserHp>0?'laser':(s.missileHp>0?'missile':null); if(!kind)return false;
+  const cfg=DEFENSE_RULES[kind], hpKey=kind+'Hp', countKey=kind+'Count';
+  const oldCount=Math.max(0,planet.buildings?.[cfg.building]||0);
+  s[hpKey]=Math.max(0,s[hpKey]-amount);
+  const newCount=s[hpKey]>0?Math.ceil(s[hpKey]/cfg.hpPer):0;
+  if(newCount<oldCount){
+    planet.buildings[cfg.building]=newCount; s[countKey]=newCount;
+    const msg='«'+planet.name+'»: уничтожена '+cfg.name.toLowerCase()+'. Осталось: '+newCount+'.';
+    if(planet.owner==='player') pushEvent('ТРЕВОГА: '+msg,'attack');
+    else if(attacker?.owner==='player') pushEvent(msg,'success');
+  }
+  flashPlanetDefense(planet);
+  const afterTotal=defenseTotals(planet).hp;
+  if(beforeTotal>0&&afterTotal<=0){
+    pushEvent(planet.owner==='player'?'ТРЕВОГА: планетарная оборона «'+planet.name+'» полностью подавлена.':'Оборона «'+planet.name+'» полностью подавлена.','attack');
+  }
+  return true;
+}
+function defenseFire(planet,dtGame,hostiles){
+  if(!hostiles.length) return;
+  const s=syncDefenseState(planet); if(!s) return;
+  for(const [kind,cfg] of Object.entries(DEFENSE_RULES)){
+    const count=Math.max(0,planet.buildings?.[cfg.building]||0); if(!count||s[kind+'Hp']<=0) continue;
+    const cdKey=kind+'Cooldown'; s[cdKey]=Math.max(0,(s[cdKey]||0)-dtGame); if(s[cdKey]>0) continue;
+    const candidates=hostiles.filter(h=>Math.hypot(h.x-planet.x,h.y-planet.y)<=cfg.range); if(!candidates.length) continue;
+    candidates.sort((a,b)=>Math.hypot(a.x-planet.x,a.y-planet.y)-Math.hypot(b.x-planet.x,b.y-planet.y));
+    const target=candidates[0]; s[cdKey]=cfg.interval;
+    const pseudo={id:'planet-defense-'+planet.id+'-'+kind,name:cfg.name,type:cfg.weaponType,owner:planet.owner,x:planet.x,y:planet.y,damage:cfg.damage*count,maxHp:1,hp:1,destroyed:false};
+    try{spawnCombatShot(pseudo,target);}catch(err){}
+    damageShip(target,cfg.damage*count,pseudo);
+  }
+}
+function assignOrbitalCombat(planet,invaders,defenders){
+  if(!invaders.length||!defenders.length) return;
+  for(const ship of invaders){
+    if(ship.destroyed||ship.combatTarget) continue;
+    let target=null,best=Infinity; for(const d of defenders){if(d.destroyed)continue;const dist=Math.hypot(ship.x-d.x,ship.y-d.y);if(dist<best){best=dist;target=d;}}
+    if(target) beginCombat(ship,target,false);
+  }
+  for(const ship of defenders){
+    if(ship.destroyed||ship.combatTarget) continue;
+    let target=null,best=Infinity; for(const a of invaders){if(a.destroyed)continue;const dist=Math.hypot(ship.x-a.x,ship.y-a.y);if(dist<best){best=dist;target=a;}}
+    if(target) beginCombat(ship,target,false);
+  }
+}
+function siegeFireOnDefense(planet,dtGame,invaders,defenders){
+  if(defenders.length||!planetDefenseAlive(planet)) return;
+  for(const ship of invaders){
+    if(ship.destroyed||ship.combatTarget) continue;
+    ship._aeSiegeCooldown=Math.max(0,(ship._aeSiegeCooldown||0)-dtGame); if(ship._aeSiegeCooldown>0) continue;
+    const interval=Math.max(.65,Number(ship.attackInterval||1.5)); ship._aeSiegeCooldown=interval;
+    const dx=planet.x-ship.x,dy=planet.y-ship.y;if(Math.hypot(dx,dy)>.001)ship._headingDeg=Math.atan2(dy,dx)*180/Math.PI;
+    try{spawnCombatShot(ship,planetImpactTarget(planet));}catch(err){}
+    damagePlanetDefense(planet,effectiveSiegeDamage(ship),ship);
+    try{if(ship.owner==='player')addShipXp(ship,1.1,'осада');}catch(err){}
+  }
+}
+function removeCaptureBadge(planet){ if(planet?._aeCaptureBadge){planet._aeCaptureBadge.remove();planet._aeCaptureBadge=null;} }
+function updateCaptureBadge(planet){
+  const c=planet?.captureState; if(!c){removeCaptureBadge(planet);return;}
+  let el=planet._aeCaptureBadge; if(!el){el=document.createElement('div');el.className='aeSiegeBadge';planetLayer.appendChild(el);planet._aeCaptureBadge=el;}
+  el.classList.toggle('player',c.attackerOwner==='player'); el.style.left=planet.x+'px'; el.style.top=(planet.y-planet.r-46)+'px';
+  const m=Math.floor(c.remaining/60),sec=Math.ceil(c.remaining%60); el.textContent=(c.paused?'ПАУЗА ':'ЗАХВАТ ')+m+':'+String(sec).padStart(2,'0');
+}
+function beginCapture(planet,attackerOwner){
+  if(!planet||planet.owner===attackerOwner||planet.captureState) return false;
+  planet.captureState={attackerOwner,remaining:CAPTURE_TIME,total:CAPTURE_TIME,startPopulation:Math.max(0,planet.population||0),lastNotice:CAPTURE_TIME,absent:0,paused:false,pausedReason:''};
+  pushEvent((planet.owner==='player'?'ТРЕВОГА: ':'')+'Начался захват «'+planet.name+'». Удерживайте орбиту '+CAPTURE_TIME+' сек.','attack');
+  updateCaptureBadge(planet); return true;
+}
+function cancelCapture(planet,reason){
+  if(!planet?.captureState)return; const attacker=planet.captureState.attackerOwner; planet.captureState=null; removeCaptureBadge(planet);
+  pushEvent('Захват «'+planet.name+'» сорван'+(reason?' — '+reason:'')+'.',attacker==='player'?'discovery':'success');
+}
+function finishCapture(planet,c){
+  const oldOwner=planet.owner, newOwner=c.attackerOwner; planet.owner=newOwner; planet.captureState=null; removeCaptureBadge(planet);
+  if(!planet.buildings)planet.buildings={}; planet.buildings.missileBattery=0;planet.buildings.laserBattery=0;
+  planet._aeDefenseState=null; planet.buildingQueue=null; planet.shipQueue=null; planet.buildingQueues={}; planet.upgradeQueues={};
+  planet.population=Math.max(250,Math.floor((planet.population||c.startPopulation||500)*.72));
+  if(newOwner==='player'){planet.playerScanned=true;planet.playerDiscoveredResources=[...(planet.resources||[])];}
+  for(const s of scouts){
+    if(s._aeSiegePlanet===planet){s._aeSiegePlanet=null;if(!s.destroyed&&s.owner===newOwner&&!s.combatTarget){try{beginOrbit(s,planet);}catch(err){}}}
+  }
+  try{buildPlanets();buildMiniMapDots();PERF.cullingDirty=true;updateWorldCulling(true);}catch(err){}
+  pushEvent('«'+planet.name+'» захвачена. Планетарная оборона уничтожена, гражданская инфраструктура перешла новому владельцу.',newOwner==='player'?'success':'attack');
+  if(oldOwner==='player'&&newOwner==='enemy') scoutCommandHint.textContent='Колония «'+planet.name+'» потеряна. Верните флот и отбейте её.';
+  else if(newOwner==='player') scoutCommandHint.textContent='«'+planet.name+'» теперь входит в вашу империю.';
+  if(scoutCommandHint.textContent){scoutCommandHint.classList.add('show');clearTimeout(finishCapture._t);finishCapture._t=setTimeout(()=>scoutCommandHint.classList.remove('show'),4200);}
+}
+
+const _baseSetScoutTarget=setScoutTarget;
+setScoutTarget=function(ship,planet,options={}){
+  const r=_baseSetScoutTarget(ship,planet,options);
+  if(ship&&planet&&r!==false&&ship.targetPlanet===planet){
+    if(isMilitaryShipType(ship.type)&&planet.owner!=='neutral'&&planet.owner!==ship.owner) ship._aeSiegePlanet=planet;
+    else if(planet.owner===ship.owner||planet.owner==='neutral') ship._aeSiegePlanet=null;
+  }
+  return r;
+};
+
+startPlanetCapture=function(planet,attackerOwner='enemy'){return beginCapture(planet,attackerOwner);};
+window.startPlanetCapture=startPlanetCapture;
+updateCaptures=function(dtGame){
+  for(const planet of planets){
+    if(!planet||!['player','enemy'].includes(planet.owner)){removeCaptureBadge(planet);continue;}
+    const hostileOwner=ownerEnemy(planet.owner);
+    const invaders=siegeShipsForPlanet(planet,hostileOwner);
+    const defenders=militaryNearPlanet(planet,planet.owner,SIEGE_RADIUS+14);
+    assignOrbitalCombat(planet,invaders,defenders);
+    defenseFire(planet,dtGame,invaders);
+    siegeFireOnDefense(planet,dtGame,invaders,defenders);
+
+    let c=planet.captureState;
+    if(!c){
+      if(invaders.length&&defenders.length===0&&!planetDefenseAlive(planet)) beginCapture(planet,hostileOwner);
+      continue;
+    }
+    const capInvaders=siegeShipsForPlanet(planet,c.attackerOwner).filter(s=>Math.hypot(s.x-planet.x,s.y-planet.y)<=CAPTURE_RADIUS);
+    const capDefenders=militaryNearPlanet(planet,planet.owner,CAPTURE_RADIUS+18);
+    let reason='';
+    if(planetDefenseAlive(planet)) reason='планетарная оборона восстановлена';
+    else if(capDefenders.length) reason='на орбите снова есть флот защитника';
+    else if(!capInvaders.length) reason='флот захвата покинул орбиту';
+    if(reason){
+      c.paused=true;c.pausedReason=reason;
+      if(!capInvaders.length){c.absent=(c.absent||0)+dtGame;if(c.absent>=10){cancelCapture(planet,'атакующие корабли уничтожены или отступили');continue;}}
+      else c.absent=0;
+    }else{
+      c.paused=false;c.pausedReason='';c.absent=0;c.remaining=Math.max(0,c.remaining-dtGame);
+      const progress=1-c.remaining/c.total;planet.population=Math.max(0,Math.floor(c.startPopulation*(1-.28*progress)));
+      for(const threshold of [120,60,30]) if(c.remaining<=threshold&&c.lastNotice>threshold){c.lastNotice=threshold;pushEvent('Захват «'+planet.name+'»: осталось '+threshold+' сек.',planet.owner==='player'?'attack':'discovery');break;}
+    }
+    updateCaptureBadge(planet);
+    if(c.remaining<=0) finishCapture(planet,c);
+  }
+};
+
+function defenseStatusHtml(planet){
+  const d=defenseTotals(planet);const defenders=militaryNearPlanet(planet,planet.owner,SIEGE_RADIUS+14).length;const pct=d.max?Math.max(0,Math.min(100,d.hp/d.max*100)):0;
+  const c=planet.captureState;
+  return '<div class="aeDefenseOverview"><div class="aeDefenseMetric"><b>'+defenders+'</b><small>боевых кораблей защищают район планеты</small></div><div class="aeDefenseMetric"><b>'+Math.ceil(d.hp)+' / '+Math.ceil(d.max)+'</b><small>прочность наземной/орбитальной обороны</small></div></div>'+
+  '<div class="aeDefenseBar"><i style="width:'+pct.toFixed(1)+'%"></i></div><div class="facilityDesc">Ракетные: '+d.missileCount+' • '+Math.ceil(d.s.missileHp)+' HP &nbsp;|&nbsp; Лазерные: '+d.laserCount+' • '+Math.ceil(d.s.laserHp)+' HP</div>'+
+  (c?'<div class="aeCaptureLive '+(c.paused?'paused':'')+'"><b>'+(c.paused?'Захват приостановлен':'ИДЁТ ЗАХВАТ')+' • '+Math.ceil(c.remaining)+' сек.</b><small>'+(c.paused?'Причина: '+c.pausedReason+'. Таймер продолжится, когда препятствие исчезнет.':'Атакующий флот удерживает орбиту. Уничтожьте его, чтобы сорвать захват.')+'</small></div>':'');
+}
+renderDefenseTab=function(planet){
+  const d=defenseTotals(planet);
+  planetMenuContent.innerHTML=`
+    <div class="planetMenuGroup theme-defense-main">
+      <div class="planetMenuGroupTitle">Щит планеты</div>
+      ${defenseStatusHtml(planet)}
+      <div class="aeDefenseHow">
+        <div class="aeDefenseStep"><span>1</span><div><b>Флот прикрытия.</b> Военные корабли возле планеты автоматически вступают в бой с вторжением.</div></div>
+        <div class="aeDefenseStep"><span>2</span><div><b>Ракетные и лазерные установки.</b> Они сами открывают огонь по вражеским боевым кораблям. Чтобы начать захват, противник должен уничтожить их все.</div></div>
+      </div>
+      ${buildingCardHtml(planet,'missileBattery')}
+      ${buildingCardHtml(planet,'laserBattery')}
+    </div>
+    <div class="planetMenuGroup theme-defense-capture">
+      <div class="planetMenuGroupTitle">Как происходит захват</div>
+      <div class="aeDefenseHow">
+        <div class="aeDefenseStep"><span>1</span><div>Атакующий флот уничтожает <b>военные корабли защитника</b> в районе планеты.</div></div>
+        <div class="aeDefenseStep"><span>2</span><div>После этого корабли автоматически подавляют <b>все ракетные и лазерные установки</b>.</div></div>
+        <div class="aeDefenseStep"><span>3</span><div>Когда защита равна нулю, начинается <b>таймер оккупации 3:00</b>. На орбите должен оставаться хотя бы один боевой корабль атакующего.</div></div>
+        <div class="aeDefenseStep"><span>4</span><div>Возвращение флота защитника или восстановление обороны <b>ставит таймер на паузу</b>. Если атакующие исчезнут на 10 секунд, захват сорвётся.</div></div>
+      </div>
+      ${planet.captureState?'':'<div class="captureWarning">Сейчас планета не захватывается. Для надёжной защиты держите на орбите патруль и стройте оба типа оборонных установок.</div>'}
+    </div>`;
+  planetMenuContent.querySelectorAll('.buildBuildingBtn').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();startBuilding(planet,btn.dataset.building);}));
+  planetMenuContent.querySelectorAll('.cancelBuildingBtn').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();cancelBuilding(planet,btn.dataset.building);}));
+};
+
+const _baseOpenPlanetInfo=openPlanetInfo;
+openPlanetInfo=function(planet){
+  _baseOpenPlanetInfo(planet);
+  if(!planet||currentInfoPlanet!==planet)return;
+  if(planet.owner==='enemy'){
+    const d=defenseTotals(planet), defenders=militaryNearPlanet(planet,'enemy',SIEGE_RADIUS+14).length, c=planet.captureState;
+    planetInfoHint.hidden=false;
+    planetInfoHintText.innerHTML='<b>Вражеская колония.</b> Защита: <b>'+defenders+' боевых корабл.</b> • батареи <b>'+(d.missileCount+d.laserCount)+'</b> • прочность <b>'+Math.ceil(d.hp)+'/'+Math.ceil(d.max)+'</b>.'+
+      '<br>Чтобы захватить планету, отправьте сюда боевой флот. Он автоматически вступит в бой, уничтожит установки, после чего нужно удерживать орбиту <b>3 минуты</b>.'+
+      (c?'<br><b>Захват: '+Math.ceil(c.remaining)+' сек.'+(c.paused?' • ПАУЗА: '+c.pausedReason:'')+'</b>':'');
+  }else if(planet.captureState){
+    const c=planet.captureState; planetInfoHint.hidden=false;
+    planetInfoHintText.innerHTML='<b>⚠ Планета атакована.</b> До завершения захвата: <b>'+Math.ceil(c.remaining)+' сек.</b>'+(c.paused?' Таймер сейчас приостановлен: '+c.pausedReason+'.':' Отправьте сюда боевой флот — его появление на орбите остановит оккупацию.');
+  }
+};
+
+// Стартовое обучение — короткое, пошаговое и с паузой игры.
+const tutorialSlides=[
+  {icon:'🌌',k:'1 / 7 • ЦЕЛЬ ПАРТИИ',title:'Построй свою звёздную империю',html:'Развивайте <b>Аврору Прайм</b>, исследуйте карту, основывайте новые колонии и создавайте флот.<span class="goal"><b>Долгосрочная задача:</b> расширять влияние и захватывать колонии противника, не позволяя ему захватить ваши.</span>'},
+  {icon:'⛏️',k:'2 / 7 • ЭКОНОМИКА',title:'Сначала — ресурсы',html:'Откройте управление стартовой планетой и развивайте добывающие станции. Все ваши колонии используют <b>единый имперский запас</b>: добытые на любой своей планете ресурсы доступны для строительства на остальных.'},
+  {icon:'🛰️',k:'3 / 7 • РАЗВЕДКА И КОЛОНИИ',title:'Открывай новые миры',html:'Отправляйте <b>спутники-разведчики</b> к неизвестным планетам. Пригодный мир можно заселить <b>колонизационным кораблём</b>. Чем больше колоний — тем выше добыча, население, наука и возможности флота.'},
+  {icon:'📦',k:'4 / 7 • УДАЛЁННАЯ ДОБЫЧА',title:'Непригодные планеты тоже ценны',html:'После полного исследования непригодной для колонизации планеты вы увидите её залежи. На каждой такой планете изначально находится <b>10 000 ед. ресурсов суммарно</b>, но состав и доли ресурсов различаются.<span class="goal">Отправьте туда <b>Грузовой корабль</b>. Он автоматически загружает ресурсы, отвозит их в общий имперский запас и возвращается. Одновременно работают до <b>2 грузовых кораблей</b>. Если корабль прилетит к уже исчерпанной планете, он останется на её орбите и будет ждать нового приказа.</span>'},
+  {icon:'☄️',k:'5 / 7 • ОСОБЫЕ ЦЕЛИ',title:'Астероиды и неизвестные сигналы',html:'На астероидах работает отдельный <b>Астероидный добытчик</b> — его задача добывать <b>Ксенит</b> и автоматически возить его на базу. Неизвестные сигналы <b>?</b> может исследовать любой корабль: внутри бывают ресурсы, технологии и другие редкие находки.'},
+  {icon:'🚀',k:'6 / 7 • ФЛОТ И БОЙ',title:'Патрулируй и формируй ударные группы',html:'Военные корабли после постройки охраняют район своей планеты. Собирайте их в группы, отправляйте на нужную планету и следите за опытом экипажей. В бою корабли автоматически сближаются, открывают огонь и отвечают на атаку.<span class="goal"><b>Ценные цели:</b> разведка может обнаружить вражеский транспорт со специалистом. Сильно повредите его и проведите абордаж, чтобы захватить пассажира.</span>'},
+  {icon:'🛡️',k:'7 / 7 • ОБОРОНА И ЗАХВАТ',title:'Защищай и восстанавливай флот',html:'Сначала уничтожьте <b>орбитальный флот защитника</b>, затем <b>ракетные и лазерные установки</b>. После подавления защиты начинается захват на <b>3 минуты</b>.<span class="goal">Защитник может сорвать операцию: вернуть флот на орбиту, восстановить оборону или уничтожить все атакующие корабли. Постройте <b>Ремонтное судно</b> — повреждённые корабли, вернувшиеся к его планете, будут автоматически восстановлены.</span>'}
+];
+let tutorialIndex=0,tutorialSavedSpeed=1,tutorialOpen=false;
+const tutOverlay=document.getElementById('aeTutorialOverlay'),tutK=document.getElementById('aeTutorialKicker'),tutT=document.getElementById('aeTutorialTitle'),tutI=document.getElementById('aeTutorialIcon'),tutText=document.getElementById('aeTutorialText'),tutDots=document.getElementById('aeTutorialDots'),tutBack=document.getElementById('aeTutorialBack'),tutNext=document.getElementById('aeTutorialNext'),tutSkip=document.getElementById('aeTutorialSkip');
+function renderTutorial(){const s=tutorialSlides[tutorialIndex];tutK.textContent=s.k;tutT.textContent=s.title;tutI.textContent=s.icon;tutText.innerHTML=s.html;tutDots.innerHTML=tutorialSlides.map((_,i)=>'<i class="aeTutorialDot '+(i===tutorialIndex?'active':'')+'"></i>').join('');tutBack.disabled=tutorialIndex===0;tutNext.textContent=tutorialIndex===tutorialSlides.length-1?'Начать игру':'Далее';}
+function openTutorial(){if(tutorialOpen)return;tutorialOpen=true;tutorialSavedSpeed=gameSpeed;gameSpeed=0;tutorialIndex=0;renderTutorial();tutOverlay.classList.add('open');tutOverlay.setAttribute('aria-hidden','false');}
+function closeTutorial(){if(!tutorialOpen)return;tutorialOpen=false;tutOverlay.classList.remove('open');tutOverlay.setAttribute('aria-hidden','true');gameSpeed=tutorialSavedSpeed||1;}
+tutBack.addEventListener('click',()=>{if(tutorialIndex>0){tutorialIndex--;renderTutorial();}});tutNext.addEventListener('click',()=>{if(tutorialIndex<tutorialSlides.length-1){tutorialIndex++;renderTutorial();}else closeTutorial();});tutSkip.addEventListener('click',closeTutorial);tutOverlay.addEventListener('pointerdown',e=>{e.stopPropagation();});
+startGameBtn.addEventListener('click',()=>{if(gameSettings?.hints!==false)setTimeout(()=>{if(gameStarted)openTutorial();},180);});
+
+// Инициализируем прочность существующей обороны.
+try{planets.forEach(syncDefenseState);}catch(err){}
+})();
+</script>
+
+
+<style id="aePersonnelRepairStyles">
+.aePersonnelBadge{position:absolute;right:-9px;top:-10px;z-index:8;min-width:20px;height:20px;padding:0 3px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:#ffe088;color:#251600;border:1px solid rgba(255,255,255,.75);font-size:11px;font-weight:950;box-shadow:0 0 12px rgba(255,204,74,.8);pointer-events:none;transform:rotate(calc(-1 * var(--ship-heading,0deg)))}
+.aePersonnelBadge.captured{background:#8ef2c4;box-shadow:0 0 12px rgba(88,255,184,.75)}
+.aeDisabledTransport{filter:saturate(.5) brightness(.82)!important;animation:aeDisabledPulse .7s ease-in-out infinite alternate}
+@keyframes aeDisabledPulse{to{filter:saturate(.35) brightness(1.18)}}
+.aeRepairBeam{position:absolute;z-index:39;height:2px;transform-origin:0 50%;pointer-events:none;background:linear-gradient(90deg,rgba(94,255,188,.15),rgba(126,255,205,.95),rgba(255,255,255,.9));box-shadow:0 0 8px rgba(86,255,190,.85);opacity:.82}
+.aeRepairingGlow{filter:drop-shadow(0 0 5px rgba(88,255,183,.95))}
+#aeBoardingOverlay{position:fixed;inset:0;z-index:690;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;background:rgba(1,4,11,.74);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+#aeBoardingOverlay.open{display:flex}.aeBoardingPanel{width:min(100%,470px);border-radius:22px;padding:18px;box-sizing:border-box;border:1px solid rgba(255,202,95,.27);background:radial-gradient(circle at 20% 0%,rgba(255,196,75,.10),transparent 34%),linear-gradient(180deg,#101a2d,#070c17);box-shadow:0 25px 80px rgba(0,0,0,.75);color:#edf8ff}.aeBoardingHead{display:flex;justify-content:space-between;gap:12px}.aeBoardingTitle{font-size:21px;font-weight:950}.aeBoardingSub{font-size:11px;color:#9fb0bf;margin-top:3px}.aeBoardingClose{width:38px;height:38px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;font-size:20px}.aeBoardingIntel{margin-top:14px;padding:12px;border-radius:14px;background:rgba(255,209,101,.07);border:1px solid rgba(255,209,101,.15);font-size:11px;line-height:1.5}.aeBoardingIntel b{color:#ffe398}.aeBoardingActions{display:grid;gap:8px;margin-top:13px}.aeBoardingActions button{padding:12px;border-radius:12px;border:1px solid rgba(101,220,255,.24);background:rgba(53,142,183,.13);color:#effcff;font-weight:850;text-align:left}.aeBoardingActions button:disabled{opacity:.42}.aeBoardingActions small{display:block;margin-top:3px;color:#98aebf;font-weight:400}.aeBoardProgress{margin-top:12px}.aeBoardProgressTrack{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}.aeBoardProgressTrack i{display:block;height:100%;background:linear-gradient(90deg,#f0b447,#7ee9bf);border-radius:999px}.aeBoardProgressText{display:flex;justify-content:space-between;margin-bottom:5px;font-size:11px;color:#b9c9d5}
+.aePersonnelSection{margin-top:14px}.aePersonnelCard{margin-top:8px;padding:11px;border-radius:13px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.085)}.aePersonnelCardHead{display:flex;justify-content:space-between;gap:10px}.aePersonnelCard b{font-size:12px}.aePersonnelCard small{display:block;color:#9db0c1;font-size:10px;line-height:1.4;margin-top:4px}.aePersonnelRole{font-size:9px;font-weight:900;color:#8ee6ff;padding:4px 7px;border-radius:999px;background:rgba(75,191,230,.09);border:1px solid rgba(94,210,250,.15);white-space:nowrap}.aeSkillGrid{display:grid;gap:6px;margin-top:9px}.aeSkillBtn{padding:9px 10px;border-radius:10px;border:1px solid rgba(125,220,255,.16);background:rgba(66,156,199,.08);color:#eaf8ff;text-align:left}.aeSkillBtn b{font-size:11px}.aeSkillBtn span{display:block;color:#91a9ba;font-size:9px;margin-top:2px}.aeChosenSkill{margin-top:8px;padding:8px 9px;border-radius:10px;background:rgba(96,225,167,.08);border:1px solid rgba(96,225,167,.16);font-size:10px;color:#c8ffe4}
+@media(max-width:520px){.aeBoardingPanel{max-height:91vh;overflow:auto}}
+</style>
+<div id="aeBoardingOverlay" aria-hidden="true"><div class="aeBoardingPanel"><div class="aeBoardingHead"><div><div class="aeBoardingTitle" id="aeBoardingTitle">Ценный транспорт</div><div class="aeBoardingSub" id="aeBoardingSub">разведданные и абордаж</div></div><button class="aeBoardingClose" id="aeBoardingClose" type="button">×</button></div><div id="aeBoardingBody"></div><div class="aeBoardingActions" id="aeBoardingActions"></div></div></div>
+<script id="aePersonnelBoardingRepairOptimization">
+(function(){
+'use strict';
+const living=window.AELivingGalaxy||null;
+const PO=window.AEPersonnelOps={
+  initialized:false,lastSlowTick:0,nextTransferAt:220,boarding:null,playerPersonnel:[],enemySpecialists:[],transportSerial:0,
+  bonusVersion:0,bonusCacheVersion:-1,bonusCache:null,repairAccumulator:0
+};
+
+const ROLE_LABELS={admiral:'Адмирал',scientist:'Учёный',engineer:'Инженер',governor:'Губернатор',explorer:'Исследователь'};
+const ROLE_ICONS={admiral:'🎖',scientist:'🔬',engineer:'🔧',governor:'🏛',explorer:'📡'};
+function personnelHint(msg){if(typeof scoutCommandHint==='undefined'||!scoutCommandHint)return;scoutCommandHint.textContent=msg;scoutCommandHint.classList.add('show');clearTimeout(personnelHint._t);personnelHint._t=setTimeout(()=>scoutCommandHint.classList.remove('show'),3200);}
+const SPECIALISTS=[
+  {id:'erhard',name:'Адмирал Каэл Эрхард',role:'admiral',rarity:'Редкий'},
+  {id:'selene',name:'Доктор Селена Вар',role:'scientist',rarity:'Редкий'},
+  {id:'mira',name:'Инженер Мира Кест',role:'engineer',rarity:'Опытный'},
+  {id:'soren',name:'Губернатор Сорен Вейл',role:'governor',rarity:'Опытный'},
+  {id:'nara',name:'Исследователь Нара Квелл',role:'explorer',rarity:'Редкий'}
+];
+const SKILLS={
+  admiral:[
+    {id:'fire',name:'Огневая доктрина',desc:'+8% урона всех ваших кораблей.',bonus:{damage:.08}},
+    {id:'maneuver',name:'Манёвренный бой',desc:'+7% скорости всего флота.',bonus:{speed:.07}},
+    {id:'formation',name:'Железный строй',desc:'−7% входящего урона вашим кораблям.',bonus:{defense:.07}},
+    {id:'range',name:'Дальний бой',desc:'+10% к дальности оружия.',bonus:{range:.10}},
+    {id:'boarding',name:'Школа абордажа',desc:'Абордаж проходит на 30% быстрее.',bonus:{boarding:.30}}
+  ],
+  scientist:[
+    {id:'theory',name:'Прикладная физика',desc:'+12% к скорост
