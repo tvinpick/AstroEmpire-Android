@@ -32,6 +32,36 @@ jobs:
               cp "$file" "inspected-source/$relative"
           done
           find inspected-source -type f | wc -l
+
+      - name: Make code excerpts and browsable text chunks
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path("inspected-source/AstroEmpire_Android/app/src/main/assets/index.html")
+          s=p.read_text(encoding="utf-8",errors="replace")
+          d=Path("inspected-source/diagnostics")
+          d.mkdir(parents=True,exist_ok=True)
+          lines=s.count("\\n")+1
+          scripts=list(re.finditer(r"<script\\b[^>]*>(.*?)</script\\s*>",s,re.I|re.S))
+          report=[f"HTML chars={len(s)} lines={lines} script_sections={len(scripts)}"]
+          report.append("HEAD: "+s[:1200].replace("\\n"," "))
+          for j,m in enumerate(scripts):
+              report.append(f"SCRIPT {j}: chars={len(m.group(1))}; starts={m.group(1)[:250]}")
+              t=m.group(1)
+              for k in range(0,len(t),180000):
+                  (d/f"script{j:02d}_part{k//180000:03d}.txt").write_text(t[k:k+180000],encoding="utf-8")
+          patterns=["pointerdown","pointermove","pointerup","touchstart","touchmove","touchend","mousedown","mousemove","pinch","wheel","gesture","fleet","planet","icon","sprite","localStorage","mapCanvas","worldMap"]
+          for name in patterns:
+              matches=list(re.finditer(re.escape(name),s,re.I))
+              report.append(f"PATTERN {name}: {len(matches)} hits")
+              for m in matches[:12]:
+                  b=max(0,m.start()-170);e=min(len(s),m.end()+240)
+                  report.append(f" {m.start()}: "+s[b:e].replace("\\n"," ")[:420])
+          (d/"code-report.txt").write_text("\\n".join(report),encoding="utf-8")
+          print(f"scripts={len(scripts)} HTML chars={len(s)} lines={lines}")
+          PY
       - name: Commit source on diagnostic branch
         shell: bash
         run: |
