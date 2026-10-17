@@ -61,6 +61,13 @@ jobs:
               for m in matches[:12]:
                   b=max(0,m.start()-170);e=min(len(s),m.end()+240)
                   report.append(f" {m.start()}: "+s[b:e].replace("\\n"," ")[:420])
+          css=s[:s.find("</style>")]
+          styles=["#viewport","#world","#scoutLayer",".scout{",".unitShip{",".planetHit{","#fogCanvas","#planetLayer",".planetWrap{","#asteroidLayer","#miniFog"]
+          for name in styles:
+              matches=list(re.finditer(re.escape(name),css,re.I))
+              report.append(f"STYLE {name}: {len(matches)} hits")
+              for m in matches[:10]:
+                  report.append(f" {m.start()}: "+css[max(0,m.start()-150):m.end()+1200])
           (d/"code-report.txt").write_text("\\n".join(report),encoding="utf-8")
           print(f"scripts={len(scripts)} HTML chars={len(s)} lines={lines}")
           PY
