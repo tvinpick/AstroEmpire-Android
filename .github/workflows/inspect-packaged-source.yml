@@ -26,7 +26,7 @@ jobs:
           find extracted-project -type f \
             \( -iname '*.kt' -o -iname '*.java' -o -iname '*.xml' -o -iname '*.gradle' -o -iname '*.gradle.kts' -o -iname '*.js' -o -iname '*.ts' -o -iname '*.tsx' -o -iname '*.jsx' -o -iname '*.html' -o -iname '*.css' -o -iname '*.md' \) \
             -not -path '*/build/*' -not -path '*/.gradle/*' -not -path '*/node_modules/*' \
-            -size -512k -print0 | while IFS= read -r -d '' file; do
+            -size -8M -print0 | while IFS= read -r -d '' file; do
               relative="${file#extracted-project/}"
               mkdir -p "inspected-source/$(dirname "$relative")"
               cp "$file" "inspected-source/$relative"
