@@ -1,0 +1,45 @@
+name: Repackage AstroEmpire regression fixes
+
+on:
+  push:
+    branches:
+      - fix/map-touch-entities-regression
+    paths:
+      - scripts/repair_game.py
+      - .github/workflows/repair-game.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Repair embedded game HTML
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/repair_game.py
+          python3 scripts/repair_game.py
+      - name: Validate repaired archive and essential game functions
+        run: |
+          set -euo pipefail
+          unzip -t AstroEmpire_Android_Project.zip | tail -1
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          with ZipFile("AstroEmpire_Android_Project.zip") as z:
+              asset=next(x for x in z.namelist() if x.endswith("/app/src/main/assets/index.html"))
+              html=z.read(asset).decode("utf-8")
+              for expected in ("aeOneFingerDrag", "ae-map-input-and-visibility-fix", "function spawnInitialScouts()", "function buildPlanets()"):
+                  assert expected in html, expected
+              print("Verified patched HTML, planets and fleet initializer.")
+          PY
+      - name: Commit repaired project archive
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add AstroEmpire_Android_Project.zip
+          git commit -m "fix: ship repaired map touch and entity visuals"
+          git push
