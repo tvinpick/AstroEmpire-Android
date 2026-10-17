@@ -1,0 +1,928 @@
+HTML chars=6971953 lines=1 script_sections=0\nHEAD: <!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>AstroEmpire</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#02040b;font-family:Arial,sans-serif}
+#viewport{position:fixed;inset:0;overflow:hidden;background:#02040b;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#world{position:absolute;left:0;top:0;width:3200px;height:2600px;will-change:transform;overflow:hidden;background:
+radial-gradient(circle at 14% 18%, rgba(54,102,218,.18) 0, rgba(22,54,102,.05) 18%, transparent 40%),
+radial-gradient(circle at 80% 25%, rgba(144,63,211,.14) 0, rgba(65,24,95,.05) 18%, transparent 38%),
+radial-gradient(circle at 44% 70%, rgba(31,160,190,.10) 0, rgba(12,60,76,.04) 15%, transparent 32%),
+radial-gradient(circle at 84% 74%, rgba(255,120,76,.05) 0, transparent 24%),
+linear-gradient(135deg, #010208 0%, #030811 30%, #02040b 100%)}
+#deepSpaceCanvas{
+  position:absolute;
+  left:0;
+  top:0;
+  width:3200px;
+  height:2600px;
+  pointer-events:none;
+  opacity:.98;
+  filter:saturate(1.08) contrast(1.06)\nPATTERN pointerdown: 27 hits\n 6580411: rlay');
+if(contextTutorialClose) contextTutorialClose.addEventListener('click',closeContextTutorial);
+if(contextTutorialOverlay) contextTutorialOverlay.addEventListener('pointerdown',e=>{
+  if(e.target === contextTutorialOverlay) closeContextTutorial();
+  else e.stopPropagation();
+});
+try{
+  resourceBarCollapsed = localStorage.getItem('astro_resource_bar_collapsed') === '1';
+}catch(e){}
+
+function applyResourceBarColl\n 6598262:  = 'asteroidLabel';
+    label.textContent = 'Астероид';
+
+    wrap.appendChild(core);
+    wrap.appendChild(rock);
+    wrap.appendChild(label);
+
+    wrap.addEventListener('pointerdown', e => {
+      if(!gameStarted) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      if(!isExploredPoint(a.x,a.y)){
+        scoutCommandHint.textContent = 'Этот астероид ещё не обнаружен разведкой.';
+        scoutCommandHin\n 6605209:   hit.style.top = p.y + 'px';
+  const hitSize = Math.max(70, p.r * 2.4);
+  hit.style.width = hitSize + 'px';
+  hit.style.height = hitSize + 'px';
+  hit.addEventListener('pointerdown', e => {
+    if(!gameStarted) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    if(selectedFleet.length){
+      sendSelectedFleetToPlanet(p);
+      return;
+    }
+
+    if(selectedScout && selectedScout.owner === 'player'){
+    \n 6617827: | target.closest('.planetHit') || target.closest('.scout') || target.closest('#planetFleetOverlay') || target.closest('#shipControlOverlay'); }
+minimap.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); jump(e.clientX,e.clientY); }, {passive:false});
+viewport.addEventListener('pointerdown', e => {
+  if(uiHit(e.target)) return;
+  if(e.pointerType==='touch'){
+    pinchPointers.set(e.pointer\n 6617964: y'); }
+minimap.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); jump(e.clientX,e.clientY); }, {passive:false});
+viewport.addEventListener('pointerdown', e => {
+  if(uiHit(e.target)) return;
+  if(e.pointerType==='touch'){
+    pinchPointers.set(e.pointerId, {x:e.clientX,y:e.clientY});
+    if(pinchPointers.size===2){
+      const pts=[...pinchPointers.values()];
+      pinchStartDistance=Mat\n 6637072: rbitPlanet) return 'На орбите «' + (ship.orbitPlanet.name || 'объекта') + '»';
+  return 'Ожидает приказа';
+}
+
+function attachShipClick(ship){
+  ship.el.addEventListener('pointerdown', e => {
+    if(!gameStarted || ship.owner !== 'player') return;
+    e.preventDefault();
+    e.stopPropagation();
+    openShipControl(ship);
+  }, {passive:false});
+}
+
+function openShipControl(ship){
+  if(!ship || ship.owner !== 'player') \n 6639969: hipControlOverlay.classList.remove('open');
+  controlledShip = null;
+}
+shipControlClose.addEventListener('click', closeShipControl);
+shipControlOverlay.addEventListener('pointerdown', e => {
+  if(e.target === shipControlOverlay) closeShipControl();
+  else e.stopPropagation();
+});
+
+function stopShip(ship){
+  if(!ship || ship.scanState || ship.cooldownState) return;
+
+  releaseShipSignalAssignment(ship);
+
+  if(ship.owne\n 6669317: 
+fleetGroupsButton.addEventListener('click',openFleetGroupsPanel);
+fleetGroupsClose.addEventListener('click',closeFleetGroupsPanel);
+fleetGroupsOverlay.addEventListener('pointerdown',e=>{
+  if(e.target === fleetGroupsOverlay) closeFleetGroupsPanel();
+  else e.stopPropagation();
+});
+
+function clearSelectedFleet(){
+  selectedFleet = [];
+  scouts.forEach(s => {
+    if(s !== selectedScout) s.el.classList.remove('selected\n 6780364: hipIds = new Set();
+
+  if(planet.owner === 'player'){
+    setResourceBarPlanet(planet);
+  }
+  // Защита от "сквозного" тапа на телефоне:
+  // окно планеты открывается по pointerdown, а синтетический click того же касания
+  // может прийти уже по появившейся строке флота. Временная блокировка — запасной слой;
+  // ниже каждая строка флота дополнительно требует собственный новый pointerdown.
+  fleetSelectionUnlockAt = \n 6780574: же касания
+  // может прийти уже по появившейся строке флота. Временная блокировка — запасной слой;
+  // ниже каждая строка флота дополнительно требует собственный новый pointerdown.
+  fleetSelectionUnlockAt = performance.now() + 850;
+
+  planetInfoTitle.textContent = planet.name;
+  planetInfoSubtitle.textContent =
+    planet.isRare
+      ? 'Редкая планета'
+      : (planet.owner === 'player'
+          ? (planet === pl\n 6785630: выбрать только новым отдельным касанием по его строке.
+        // Если окно планеты появилось под уже зажатым пальцем, последующий click
+        // не имеет собственного pointerdown на этой строке и будет проигнорирован.
+        row._fleetSelectionArmed = false;
+
+        row.addEventListener('pointerdown', e => {
+          if(performance.now() < fleetSelectionUnlockAt){
+            row._fleetSelectionArmed = false;
+ \n 6785754: дующий click
+        // не имеет собственного pointerdown на этой строке и будет проигнорирован.
+        row._fleetSelectionArmed = false;
+
+        row.addEventListener('pointerdown', e => {
+          if(performance.now() < fleetSelectionUnlockAt){
+            row._fleetSelectionArmed = false;
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+          row._fleetSelectio\nPATTERN pointermove: 1 hits\n 6618722: clientX; panStartY=e.clientY; worldStartX=x; worldStartY=y;
+  try{ viewport.setPointerCapture(e.pointerId); }catch(err){}
+}, {passive:false});
+viewport.addEventListener('pointermove', e => {
+  if(e.pointerType==='touch' && pinchPointers.has(e.pointerId)){
+    pinchPointers.set(e.pointerId, {x:e.clientX,y:e.clientY});
+    if(pinchPointers.size===2){
+      e.preventDefault(); const pts=[...pinchPointers.values()]; cons\nPATTERN pointerup: 1 hits\n 6620283: .every(s => s.type !== 'scout')){
+    sendShipsToPoint([...selectedFleet],p.x,p.y);
+    clearSelectedFleet();
+    clearScoutSelection();
+  }
+}
+viewport.addEventListener('pointerup', endPan, {passive:false}); viewport.addEventListener('pointercancel', endPan, {passive:false});
+viewport.addEventListener('wheel', e => { e.preventDefault(); const delta = e.deltaY < 0 ? 0.12 : -0.12; setZoom(scale + delta, e.clientX, e.c\nPATTERN touchstart: 0 hits\nPATTERN touchmove: 0 hits\nPATTERN touchend: 0 hits\nPATTERN mousedown: 0 hits\nPATTERN mousemove: 0 hits\nPATTERN pinch: 28 hits\n 6617492: nst targetWorldX = (mx/r.width)*WORLD_W, targetWorldY = (my/r.height)*WORLD_H; x = innerWidth/2-targetWorldX*scale; y = innerHeight/2-targetWorldY*scale; render(); }
+let pinchPointers = new Map(), pinchStartDistance = 0, pinchStartScale = 1, pinchCenterX = 0, pinchCenterY = 0;
+function uiHit(target){ return minimap.contains(target) || target.closest('.planetHit') || target.closest('.scout') || target.closest('#p\n 6617519: dth)*WORLD_W, targetWorldY = (my/r.height)*WORLD_H; x = innerWidth/2-targetWorldX*scale; y = innerHeight/2-targetWorldY*scale; render(); }
+let pinchPointers = new Map(), pinchStartDistance = 0, pinchStartScale = 1, pinchCenterX = 0, pinchCenterY = 0;
+function uiHit(target){ return minimap.contains(target) || target.closest('.planetHit') || target.closest('.scout') || target.closest('#planetFleetOverlay') || targ\n 6617543: dY = (my/r.height)*WORLD_H; x = innerWidth/2-targetWorldX*scale; y = innerHeight/2-targetWorldY*scale; render(); }
+let pinchPointers = new Map(), pinchStartDistance = 0, pinchStartScale = 1, pinchCenterX = 0, pinchCenterY = 0;
+function uiHit(target){ return minimap.contains(target) || target.closest('.planetHit') || target.closest('.scout') || target.closest('#planetFleetOverlay') || target.closest('#shipControl\n 6617564: RLD_H; x = innerWidth/2-targetWorldX*scale; y = innerHeight/2-targetWorldY*scale; render(); }
+let pinchPointers = new Map(), pinchStartDistance = 0, pinchStartScale = 1, pinchCenterX = 0, pinchCenterY = 0;
+function uiHit(target){ return minimap.contains(target) || target.closest('.planetHit') || target.closest('.scout') || target.closest('#planetFleetOverlay') || target.closest('#shipControlOverlay'); }
+minimap.\n 6617582: dth/2-targetWorldX*scale; y = innerHeight/2-targetWorldY*scale; render(); }
+let pinchPointers = new Map(), pinchStartDistance = 0, pinchStartScale = 1, pinchCenterX = 0, pinchCenterY = 0;
+function uiHit(target){ return minimap.contains(target) || target.closest('.planetHit') || target.closest('.scout') || target.closest('#planetFleetOverlay') || target.closest('#shipControlOverlay'); }
+minimap.addEventListener('\n 6618050: ation(); jump(e.clientX,e.clientY); }, {passive:false});
+viewport.addEventListener('pointerdown', e => {
+  if(uiHit(e.target)) return;
+  if(e.pointerType==='touch'){
+    pinchPointers.set(e.pointerId, {x:e.clientX,y:e.clientY});
+    if(pinchPointers.size===2){
+      const pts=[...pinchPointers.values()];
+      pinchStartDistance=Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+      pinchStartScale=scale; pinch\n 6618116: addEventListener('pointerdown', e => {
+  if(uiHit(e.target)) return;
+  if(e.pointerType==='touch'){
+    pinchPointers.set(e.pointerId, {x:e.clientX,y:e.clientY});
+    if(pinchPointers.size===2){
+      const pts=[...pinchPointers.values()];
+      pinchStartDistance=Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+      pinchStartScale=scale; pinchCenterX=(pts[0].x+pts[1].x)/2; pinchCenterY=(pts[0].y+pts[1].y)/2;\n 6618161: iHit(e.target)) return;
+  if(e.pointerType==='touch'){
+    pinchPointers.set(e.pointerId, {x:e.clientX,y:e.clientY});
+    if(pinchPointers.size===2){
+      const pts=[...pinchPointers.values()];
+      pinchStartDistance=Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+      pinchStartScale=scale; pinchCenterX=(pts[0].x+pts[1].x)/2; pinchCenterY=(pts[0].y+pts[1].y)/2;
+      pan=false; panPointer=null; return;
+  \n 6618192: pointerType==='touch'){
+    pinchPointers.set(e.pointerId, {x:e.clientX,y:e.clientY});
+    if(pinchPointers.size===2){
+      const pts=[...pinchPointers.values()];
+      pinchStartDistance=Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+      pinchStartScale=scale; pinchCenterX=(pts[0].x+pts[1].x)/2; pinchCenterY=(pts[0].y+pts[1].y)/2;
+      pan=false; panPointer=null; return;
+    }
+  }
+  if(e.pointerType==='m\n 6618267: .clientY});
+    if(pinchPointers.size===2){
+      const pts=[...pinchPointers.values()];
+      pinchStartDistance=Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+      pinchStartScale=scale; pinchCenterX=(pts[0].x+pts[1].x)/2; pinchCenterY=(pts[0].y+pts[1].y)/2;
+      pan=false; panPointer=null; return;
+    }
+  }
+  if(e.pointerType==='mouse' && e.button!==0) return;
+  e.preventDefault(); pan=true; panMoved=fal\n 6618290: hPointers.size===2){
+      const pts=[...pinchPointers.values()];
+      pinchStartDistance=Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+      pinchStartScale=scale; pinchCenterX=(pts[0].x+pts[1].x)/2; pinchCenterY=(pts[0].y+pts[1].y)/2;
+      pan=false; panPointer=null; return;
+    }
+  }
+  if(e.pointerType==='mouse' && e.button!==0) return;
+  e.preventDefault(); pan=true; panMoved=false; panPointer=e.pointe\n 6618326: =[...pinchPointers.values()];
+      pinchStartDistance=Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+      pinchStartScale=scale; pinchCenterX=(pts[0].x+pts[1].x)/2; pinchCenterY=(pts[0].y+pts[1].y)/2;
+      pan=false; panPointer=null; return;
+    }
+  }
+  if(e.pointerType==='mouse' && e.button!==0) return;
+  e.preventDefault(); pan=true; panMoved=false; panPointer=e.pointerId; panStartX=e.clientX; panStartY=\nPATTERN wheel: 3 hits\n 3436394: tEesZ49guBwCTKl6UVKxnyGMtdcW8ruxOiDCMgdVXOyF8KaAADIpWtFrWcdtMe3jX+w8nwADR/OI3fltG+b+qLBjKTcrj0Y1VpPIZJ6wflcdgxFC+/OYH8ZXY8Q5/4RKPU2iKmMkkIzA+8kIiuqzW3ffCjTrD3IUXPyo9sJ2BWWhEELN1TzvjicP2+UIxmSJ6U+VCtHIWqErUALiqjOuNkRKqX1ueD75B2HrPPUSRs+jt5d5zzloAjmFDojV/enQFqlH9Mkk1pWnMrkFrKe0B9N75hSqYUCTM05CGqgsi8mEXG0YneAPZW5jq32esCCMYdWCk/plUtJpjmUvK+28Z16t9j9UJXwYdspjHpBq0mCzp8+m6K27ZETzdZV+xp8JlJsEmDAII6njpAYDs/E+mMcaSUST6fg\n 6047325: hXxWoIxdJ13bvEjXNEFRIOHJxNExfzNjcQUcEhDEQZG9hfX3tl+1MoFDJFkAuFL4gbQ3TsFJcWWCQ7gTUSY+Tw5AQctBGkt44hu5SN/PYx5Bdd1kb7W1+9JNI3CxEw1oNYuggHh0ckFTQJHkMthqGBnfUh13/78uhCoXCFIsiFwheEl2WDDkVTxIojBUOXLEdnLdVgwCJ0/cjEfioTuU+lkt3Gq9tL0CuPjfL8bZnEJQSQ3LEaSVwObDSEfrZFFGg10Qk8PlFazKomuTaRoXTsVjAuclwovFJKrmSh8AXhpEKqms7maUuEhLgRF/MpbQeLtMA1nlY7jAExghpFBIzxECyqETEgKiQNuUc1CgZCItcUk1AEsQaMw4mhSgskKmiOR6e+Hjn1Qm+MxyaIotmadp6ua/E13\n 6620417: );
+  }
+}
+viewport.addEventListener('pointerup', endPan, {passive:false}); viewport.addEventListener('pointercancel', endPan, {passive:false});
+viewport.addEventListener('wheel', e => { e.preventDefault(); const delta = e.deltaY < 0 ? 0.12 : -0.12; setZoom(scale + delta, e.clientX, e.clientY); }, {passive:false});
+
+
+function gameTimeText(){
+  const total = Math.max(0, Math.floor(gameElapsed));
+  const m = Math.fl\nPATTERN gesture: 0 hits\nPATTERN fleet: 459 hits\n 596256: ext-align:center;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .35s ease;
+}
+#scoutCommandHint.show{opacity:1}
+
+
+/* ===== Меню планеты и флота ===== */
+#planetFleetOverlay{
+  position:fixed;
+  inset:0;
+  z-index:320;
+  display:none;
+  align-items:flex-end;
+  justify-content:center;
+  padding:14px;
+  box-sizing:border-box;
+  background:rgba(0,4,12,.34);
+  backdrop-filter:blur(2px);
+}
+#planetFleetOverla\n 596490: lay:none;
+  align-items:flex-end;
+  justify-content:center;
+  padding:14px;
+  box-sizing:border-box;
+  background:rgba(0,4,12,.34);
+  backdrop-filter:blur(2px);
+}
+#planetFleetOverlay.open{display:flex}
+.planetFleetPanel{
+  width:min(100%,470px);
+  max-height:74vh;
+  overflow:auto;
+  box-sizing:border-box;
+  padding:18px;
+  border-radius:20px;
+  border:1px solid rgba(154,205,255,.28);
+  background:linear-gradient\n 596529: tify-content:center;
+  padding:14px;
+  box-sizing:border-box;
+  background:rgba(0,4,12,.34);
+  backdrop-filter:blur(2px);
+}
+#planetFleetOverlay.open{display:flex}
+.planetFleetPanel{
+  width:min(100%,470px);
+  max-height:74vh;
+  overflow:auto;
+  box-sizing:border-box;
+  padding:18px;
+  border-radius:20px;
+  border:1px solid rgba(154,205,255,.28);
+  background:linear-gradient(180deg,rgba(10,20,38,.97),rgba(4,10,22\n 596850: lid rgba(154,205,255,.28);
+  background:linear-gradient(180deg,rgba(10,20,38,.97),rgba(4,10,22,.98));
+  box-shadow:0 20px 60px rgba(0,0,0,.52);
+  color:#edf6ff;
+}
+.planetFleetHead{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+#planetFleetTitle{
+  margin:0;
+  font-size:20px;
+}
+#planetFleetResources{
+  margin-top:8px;
+}
+.planetHeaderSummary{
+  display:flex;
+  flex-wrap:w\n 596957: -shadow:0 20px 60px rgba(0,0,0,.52);
+  color:#edf6ff;
+}
+.planetFleetHead{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+#planetFleetTitle{
+  margin:0;
+  font-size:20px;
+}
+#planetFleetResources{
+  margin-top:8px;
+}
+.planetHeaderSummary{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+}
+.planetSummaryChip{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-height:28px;
+ \n 597008: f;
+}
+.planetFleetHead{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+#planetFleetTitle{
+  margin:0;
+  font-size:20px;
+}
+#planetFleetResources{
+  margin-top:8px;
+}
+.planetHeaderSummary{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+}
+.planetSummaryChip{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-height:28px;
+  padding:6px 9px;
+  border-radius:11px;
+  border:1p\n 597887: x;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+.planetSummaryChip .chipValue{
+  color:#edf6ff;
+  font-weight:800;
+  font-size:10px;
+}
+.planetFleetClose{
+  flex:none;
+  width:36px;
+  height:36px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.06);
+  color:#fff;
+  font-size:22px;
+}
+.fleetSectionTitle{
+  margin:18px 0 9px;
+  color:#8fa7c3;\n 598076: none;
+  width:36px;
+  height:36px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.06);
+  color:#fff;
+  font-size:22px;
+}
+.fleetSectionTitle{
+  margin:18px 0 9px;
+  color:#8fa7c3;
+  font-size:11px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+}
+#planetFleetList{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.fleetShip{
+  display:flex;
+  align-items:ce\n 598212:  color:#fff;
+  font-size:22px;
+}
+.fleetSectionTitle{
+  margin:18px 0 9px;
+  color:#8fa7c3;
+  font-size:11px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+}
+#planetFleetList{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.fleetShip{
+  display:flex;
+  align-items:center;
+  gap:11px;
+  width:100%;
+  box-sizing:border-box;
+  padding:10px 11px;
+  border-radius:13px;
+  border:1px solid rgba(142,199,255,\n 598278:  0 9px;
+  color:#8fa7c3;
+  font-size:11px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+}
+#planetFleetList{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.fleetShip{
+  display:flex;
+  align-items:center;
+  gap:11px;
+  width:100%;
+  box-sizing:border-box;
+  padding:10px 11px;
+  border-radius:13px;
+  border:1px solid rgba(142,199,255,.18);
+  background:rgba(20,39,67,.68);
+  color:#eef7ff;
+  text-ali\n 598535: :border-box;
+  padding:10px 11px;
+  border-radius:13px;
+  border:1px solid rgba(142,199,255,.18);
+  background:rgba(20,39,67,.68);
+  color:#eef7ff;
+  text-align:left;
+}
+.fleetShipIcon{
+  position:relative;
+  width:28px;
+  height:18px;
+  flex:none;
+}
+.fleetShipIcon::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:9px;
+  height:9px;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+ \n 598616: 42,199,255,.18);
+  background:rgba(20,39,67,.68);
+  color:#eef7ff;
+  text-align:left;
+}
+.fleetShipIcon{
+  position:relative;
+  width:28px;
+  height:18px;
+  flex:none;
+}
+.fleetShipIcon::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:9px;
+  height:9px;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#fff,#82c8ff 30%,#245d92 75%);
+  bo\nPATTERN planet: 2394 hits\n 2012: )}}
+@keyframes tw3{0%,100%{opacity:.3;transform:scale(.95)}25%{opacity:.6;transform:scale(1.08)}55%{opacity:1;transform:scale(1.24)}80%{opacity:.45;transform:scale(1)}}
+#planetLayer{position:absolute;inset:0}
+.planetWrap{position:absolute;transform:translate(-50%,-50%);pointer-events:none;animation:floatPlanet 16s ease-in-out infinite}
+@keyframes floatPlanet{0%,100%{transform:translate(-50%,-50%) translateY(0px)}\n 2052: ansform:scale(.95)}25%{opacity:.6;transform:scale(1.08)}55%{opacity:1;transform:scale(1.24)}80%{opacity:.45;transform:scale(1)}}
+#planetLayer{position:absolute;inset:0}
+.planetWrap{position:absolute;transform:translate(-50%,-50%);pointer-events:none;animation:floatPlanet 16s ease-in-out infinite}
+@keyframes floatPlanet{0%,100%{transform:translate(-50%,-50%) translateY(0px)}50%{transform:translate(-50%,-50%) trans\n 2147: {opacity:.45;transform:scale(1)}}
+#planetLayer{position:absolute;inset:0}
+.planetWrap{position:absolute;transform:translate(-50%,-50%);pointer-events:none;animation:floatPlanet 16s ease-in-out infinite}
+@keyframes floatPlanet{0%,100%{transform:translate(-50%,-50%) translateY(0px)}50%{transform:translate(-50%,-50%) translateY(-6px)}}
+.planetBackShadow{position:absolute;left:50%;top:58%;transform:translate(-50%,-50\n 2196: sition:absolute;inset:0}
+.planetWrap{position:absolute;transform:translate(-50%,-50%);pointer-events:none;animation:floatPlanet 16s ease-in-out infinite}
+@keyframes floatPlanet{0%,100%{transform:translate(-50%,-50%) translateY(0px)}50%{transform:translate(-50%,-50%) translateY(-6px)}}
+.planetBackShadow{position:absolute;left:50%;top:58%;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(c\n 2313: loatPlanet 16s ease-in-out infinite}
+@keyframes floatPlanet{0%,100%{transform:translate(-50%,-50%) translateY(0px)}50%{transform:translate(-50%,-50%) translateY(-6px)}}
+.planetBackShadow{position:absolute;left:50%;top:58%;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle, rgba(0,0,0,.44) 0, rgba(0,0,0,.18) 48%, rgba(0,0,0,0) 74%);filter:blur(18px);opacity:.8}
+.planetGlow{position:\n 2539: sform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle, rgba(0,0,0,.44) 0, rgba(0,0,0,.18) 48%, rgba(0,0,0,0) 74%);filter:blur(18px);opacity:.8}
+.planetGlow{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;filter:blur(18px);opacity:.22;animation:pulseGlow 4.8s ease-in-out infinite}
+@keyframes pulseGlow{0%,100%{opacity:.15;transform:translate(-50%,-50%) sc\n 2856: 8s ease-in-out infinite}
+@keyframes pulseGlow{0%,100%{opacity:.15;transform:translate(-50%,-50%) scale(.96)}50%{opacity:.34;transform:translate(-50%,-50%) scale(1.05)}}
+.planetSpin{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center;animation:spinPlanet 140s linear infinite}
+@keyframes spinPlanet{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-\n 2978: 4;transform:translate(-50%,-50%) scale(1.05)}}
+.planetSpin{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center;animation:spinPlanet 140s linear infinite}
+@keyframes spinPlanet{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+.planetShade,.planetSpec,.planetRim{position:absolute;left:50%;top:50%;transform:translate(-50%\n 3022: }}
+.planetSpin{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center;animation:spinPlanet 140s linear infinite}
+@keyframes spinPlanet{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+.planetShade,.planetSpec,.planetRim{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none\n 3130: ter;animation:spinPlanet 140s linear infinite}
+@keyframes spinPlanet{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+.planetShade,.planetSpec,.planetRim{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none}
+.planetShade{background:radial-gradient(circle at 28% 26%, rgba(255,255,255,0) 34%, rgba(0,0,0,.05) 58%, r\n 3143: :spinPlanet 140s linear infinite}
+@keyframes spinPlanet{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+.planetShade,.planetSpec,.planetRim{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none}
+.planetShade{background:radial-gradient(circle at 28% 26%, rgba(255,255,255,0) 34%, rgba(0,0,0,.05) 58%, rgba(0,0,0,.22\n 3155: 140s linear infinite}
+@keyframes spinPlanet{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+.planetShade,.planetSpec,.planetRim{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none}
+.planetShade{background:radial-gradient(circle at 28% 26%, rgba(255,255,255,0) 34%, rgba(0,0,0,.05) 58%, rgba(0,0,0,.22) 76%, rgba(\nPATTERN icon: 299 hits\n 597402: ius:11px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.045);
+  color:#d6e6f7;
+  font-size:10px;
+  line-height:1.25;
+}
+.planetSummaryChip .chipIcon{
+  width:18px;
+  height:18px;
+  border-radius:7px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(100,172,255,.14);
+  color:#9dd6ff;
+  font-size:11px;
+  flex:none;
+}
+.planetSummaryChip .chipBody{
+  min-wi\n 598544: ox;
+  padding:10px 11px;
+  border-radius:13px;
+  border:1px solid rgba(142,199,255,.18);
+  background:rgba(20,39,67,.68);
+  color:#eef7ff;
+  text-align:left;
+}
+.fleetShipIcon{
+  position:relative;
+  width:28px;
+  height:18px;
+  flex:none;
+}
+.fleetShipIcon::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:9px;
+  height:9px;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  backgro\n 598625: 5,.18);
+  background:rgba(20,39,67,.68);
+  color:#eef7ff;
+  text-align:left;
+}
+.fleetShipIcon{
+  position:relative;
+  width:28px;
+  height:18px;
+  flex:none;
+}
+.fleetShipIcon::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:9px;
+  height:9px;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#fff,#82c8ff 30%,#245d92 75%);
+  box-shadow\n 598912: ate(-50%,-50%);
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#fff,#82c8ff 30%,#245d92 75%);
+  box-shadow:0 0 7px rgba(83,183,255,.45);
+}
+.fleetShipIcon::after{
+  content:"";
+  position:absolute;
+  left:1px;
+  right:1px;
+  top:7px;
+  height:4px;
+  border:1px solid rgba(140,208,255,.55);
+  background:rgba(58,134,194,.45);
+}
+.fleetShipText{flex:1;min-width:0}
+.fleetShipName{font-size:14px;fo\n 602865: ht:700;
+  touch-action:manipulation;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  text-align:center;
+}
+.planetTabIcon{
+  font-size:14px;
+  line-height:1;
+  opacity:.95;
+}
+.planetTabLabel{
+  font-size:10px;
+  font-weight:800;
+}
+.planetTab.active{
+  color:#eef8ff;
+  border-color:rgba(111,195,255,.40);
+  background:rgba(40,113,170,.28);
+  box-shadow:0 0 12px\n 604643: ,76,.55),rgba(10,20,40,.45));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+.planetTabHelperTop{
+  display:flex;
+  align-items:center;
+  gap:9px;
+}
+.planetTabHelperIcon{
+  width:30px;
+  height:30px;
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(86,166,255,.14);
+  border:1px solid rgba(111,195,255,.18);
+  font-size:16px;
+  flex:none;
+}
+.planetTabHel\n 610521: );
+}
+.planetFacility:last-child{border-bottom:0;padding-bottom:0}
+
+.planetNotice{
+  position:relative;
+  z-index:1;
+}
+.planetFacility:first-child{padding-top:0}
+.facilityIcon{
+  flex:none;
+  width:31px;
+  height:31px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:9px;
+  background:rgba(50,110,158,.16);
+  border:1px solid rgba(113,183,235,.15);
+  font-size:16px;
+}
+.facilityText{\n 618931: ;
+  border-radius:12px;
+  border:1px solid rgba(128,190,239,.12);
+  background:rgba(13,29,51,.60);
+}
+.buildHead{
+  display:flex;
+  align-items:center;
+  gap:9px;
+}
+.buildIcon{
+  width:34px;height:34px;flex:none;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:10px;
+  background:rgba(42,113,166,.16);
+  border:1px solid rgba(112,184,235,.15);
+  font-size:18px;
+}
+.buildText{flex:1;min-wid\n 631295: ,229,.16), transparent 28%),
+    linear-gradient(180deg, rgba(18,51,60,.88), rgba(12,21,34,.92));
+}
+.buildHead{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.buildIcon{
+  position:relative;
+  width:48px;
+  height:48px;
+  flex:none;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,25\n 631645: 55,255,255,.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    inset 0 -8px 14px rgba(0,0,0,.18),
+    0 8px 18px rgba(0,0,0,.16);
+  overflow:hidden;
+}
+.buildIcon::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(145deg, rgba(255,255,255,.10), transparent 44%);
+  pointer-events:none;
+}
+.buildIcon.ironMine{
+  background:linear-gradient(180deg, rgba(116,143,167,.95), \n 631814: dIcon::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(145deg, rgba(255,255,255,.10), transparent 44%);
+  pointer-events:none;
+}
+.buildIcon.ironMine{
+  background:linear-gradient(180deg, rgba(116,143,167,.95), rgba(58,78,101,.96));
+}
+.buildIcon.copperMine{
+  background:linear-gradient(180deg, rgba(210,130,74,.96), rgba(113,58,38,.97));
+}
+.buildIcon.lithiumMine{
+  background:li\n 631919: 5,255,255,.10), transparent 44%);
+  pointer-events:none;
+}
+.buildIcon.ironMine{
+  background:linear-gradient(180deg, rgba(116,143,167,.95), rgba(58,78,101,.96));
+}
+.buildIcon.copperMine{
+  background:linear-gradient(180deg, rgba(210,130,74,.96), rgba(113,58,38,.97));
+}
+.buildIcon.lithiumMine{
+  background:linear-gradient(180deg, rgba(85,216,213,.96), rgba(34,114,121,.97));
+}
+.buildIcon.missileBattery{
+  backgro\nPATTERN sprite: 11 hits\n 1153661: Dots"></div>
+    <div id="miniAlerts"></div>
+    <canvas id="miniFog" width="120" height="98"></canvas>
+    <span id="miniView"></span>
+  </button>
+</div>
+<script>
+const SPRITES = {"aurora_swirl":{"src":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMsAAADJCAYAAACNM8Y4AAEAAElEQVR4nOz92ZMl2XHmCf70bGZ2F9/CY8vITCTXatZUda1dPSMjLTIjMv0n98s8TffMSHWtLNZGEEACidxiD9/uYmZn0XlQc0/0VJEFkgAJkLgiIZEZGRlxr/tRO6qffovwm9cv5fXkyR\n 6601368: й'
+    : 'непригодна для постоянного населения — подходит для добывающей инфраструктуры';
+}
+
+function addPlanetVisual(p){
+  const style = STYLE_DEFS[p.styleKey];
+  const sprite = SPRITES[p.styleKey];
+  const isRinged = [
+    'cream_ringed','cyan_ringed','green_ringed','pink_ringed','saturn_tall',
+    'amethyst_ringed','ivory_ringed'
+  ].includes(p.styleKey);
+  if(p.owner === 'player' || p.owner === 'enemy'){
+    \n 6601377: 'непригодна для постоянного населения — подходит для добывающей инфраструктуры';
+}
+
+function addPlanetVisual(p){
+  const style = STYLE_DEFS[p.styleKey];
+  const sprite = SPRITES[p.styleKey];
+  const isRinged = [
+    'cream_ringed','cyan_ringed','green_ringed','pink_ringed','saturn_tall',
+    'amethyst_ringed','ivory_ringed'
+  ].includes(p.styleKey);
+  if(p.owner === 'player' || p.owner === 'enemy'){
+    const aur\n 6602321: d(13, 22).toFixed(2) + 's';
+  wrap.style.animationDelay = '-' + rand(0, 10).toFixed(2) + 's';
+
+  const displayW = p.r * 2 * style.display;
+  const displayH = displayW * (sprite.h / sprite.w);
+  wrap.style.width = displayW + 'px';
+  wrap.style.height = Math.max(displayH, p.r*2*1.12) + 'px';
+
+  const backShadow = document.createElement('div');
+  backShadow.className = 'planetBackShadow';
+  backShadow.style.width = \n 6602332: oFixed(2) + 's';
+  wrap.style.animationDelay = '-' + rand(0, 10).toFixed(2) + 's';
+
+  const displayW = p.r * 2 * style.display;
+  const displayH = displayW * (sprite.h / sprite.w);
+  wrap.style.width = displayW + 'px';
+  wrap.style.height = Math.max(displayH, p.r*2*1.12) + 'px';
+
+  const backShadow = document.createElement('div');
+  backShadow.className = 'planetBackShadow';
+  backShadow.style.width = (displayW *\n 6603450: ';
+  spin.style.animationDirection = Math.random() < 0.5 ? 'normal' : 'reverse';
+
+  const img = document.createElement('img');
+  img.className = 'planetImg';
+  img.src = sprite.src;
+  img.width = Math.round(displayW);
+  img.height = Math.round(displayH);
+  spin.appendChild(img);
+  wrap.appendChild(spin);
+
+  const coreSize = p.r * 2.06;
+  const shade = document.createElement('div');
+  shade.className = 'planetShad\n 6700914: || planet.owner !== 'player'){
+    selectedPlanetResourceBar.classList.remove('show');
+    return;
+  }
+
+  selectedResourceName.textContent = 'Имперский резерв';
+
+  const sprite = SPRITES[planet.styleKey];
+  selectedResourcePlanetIcon.style.backgroundImage = sprite?.src ? `url(${sprite.src})` : 'none';
+  selectedResourcePlanetIcon.style.backgroundColor = sprite?.src ? 'transparent' : 'rgba(58,96,145,.45)';
+
+  cons\n 6700923: .owner !== 'player'){
+    selectedPlanetResourceBar.classList.remove('show');
+    return;
+  }
+
+  selectedResourceName.textContent = 'Имперский резерв';
+
+  const sprite = SPRITES[planet.styleKey];
+  selectedResourcePlanetIcon.style.backgroundImage = sprite?.src ? `url(${sprite.src})` : 'none';
+  selectedResourcePlanetIcon.style.backgroundColor = sprite?.src ? 'transparent' : 'rgba(58,96,145,.45)';
+
+  const priorit\n 6701002:    return;
+  }
+
+  selectedResourceName.textContent = 'Имперский резерв';
+
+  const sprite = SPRITES[planet.styleKey];
+  selectedResourcePlanetIcon.style.backgroundImage = sprite?.src ? `url(${sprite.src})` : 'none';
+  selectedResourcePlanetIcon.style.backgroundColor = sprite?.src ? 'transparent' : 'rgba(58,96,145,.45)';
+
+  const priority = ['Железо','Медь','Литий','Никель','Титан','Платина'];
+  const empireKeys = \n 6701023: ectedResourceName.textContent = 'Имперский резерв';
+
+  const sprite = SPRITES[planet.styleKey];
+  selectedResourcePlanetIcon.style.backgroundImage = sprite?.src ? `url(${sprite.src})` : 'none';
+  selectedResourcePlanetIcon.style.backgroundColor = sprite?.src ? 'transparent' : 'rgba(58,96,145,.45)';
+
+  const priority = ['Железо','Медь','Литий','Никель','Титан','Платина'];
+  const empireKeys = empireResourceKeys();\n 6701100: [planet.styleKey];
+  selectedResourcePlanetIcon.style.backgroundImage = sprite?.src ? `url(${sprite.src})` : 'none';
+  selectedResourcePlanetIcon.style.backgroundColor = sprite?.src ? 'transparent' : 'rgba(58,96,145,.45)';
+
+  const priority = ['Железо','Медь','Литий','Никель','Титан','Платина'];
+  const empireKeys = empireResourceKeys();
+  const resources = [...new Set([
+    ...priority,
+    ...empireKeys
+  ])].f\nPATTERN localStorage: 4 hits\n 6580557: erlay.addEventListener('pointerdown',e=>{
+  if(e.target === contextTutorialOverlay) closeContextTutorial();
+  else e.stopPropagation();
+});
+try{
+  resourceBarCollapsed = localStorage.getItem('astro_resource_bar_collapsed') === '1';
+}catch(e){}
+
+function applyResourceBarCollapsedState(){
+  if(!selectedPlanetResourceBar || !resourceBarToggle) return;
+  selectedPlanetResourceBar.classList.toggle('resourceBarCollapsed', \n 6581331: ent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    resourceBarCollapsed = !resourceBarCollapsed;
+    applyResourceBarCollapsedState();
+    try{
+      localStorage.setItem('astro_resource_bar_collapsed', resourceBarCollapsed ? '1' : '0');
+    }catch(e){}
+  });
+}
+applyResourceBarCollapsedState();
+
+
+const MILITARY_SHIP_TYPES = new Set([
+  'interceptor',
+  'corvette',
+  'frigate',
+  'destroyer',
+  'cr\n 6625132: tContent = '×' + (String(gameSpeed).endsWith('.0') ? String(gameSpeed).slice(0,-2) : gameSpeed);
+  }
+}
+
+
+function loadGameSettings(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('astroEmpireSettings') || '{}');
+    gameSettings = {...DEFAULT_GAME_SETTINGS,...saved};
+  }catch(err){
+    gameSettings = {...DEFAULT_GAME_SETTINGS};
+  }
+}
+function saveGameSettings(){
+  try{ localStorage.setItem('astroEmpireSet\n 6625346: || '{}');
+    gameSettings = {...DEFAULT_GAME_SETTINGS,...saved};
+  }catch(err){
+    gameSettings = {...DEFAULT_GAME_SETTINGS};
+  }
+}
+function saveGameSettings(){
+  try{ localStorage.setItem('astroEmpireSettings',JSON.stringify(gameSettings)); }catch(err){}
+}
+function colorValue(side,value){
+  const map = side === 'player'
+    ? {blue:'#62b8ff',green:'#68df91',purple:'#ba80ff',gold:'#e8bf55'}
+    : {red:'#ff6e6e',ora\nPATTERN mapCanvas: 0 hits\nPATTERN worldMap: 0 hits
