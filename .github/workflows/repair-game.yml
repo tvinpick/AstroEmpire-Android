@@ -1,4 +1,4 @@
-name: Repackage AstroEmpire regression fixes
+name: Build AstroEmpire map regression fix
 
 on:
   push:
@@ -12,34 +12,81 @@ permissions:
   contents: write
 
 jobs:
-  repair-package:
+  repair-and-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          persist-credentials: true
-      - name: Repair embedded game HTML
+      - name: Verify or patch game archive
+        shell: bash
         run: |
-          set -euo pipefail
           python3 -m py_compile scripts/repair_game.py
-          python3 scripts/repair_game.py
-      - name: Validate repaired archive and essential game functions
-        run: |
-          set -euo pipefail
-          unzip -t AstroEmpire_Android_Project.zip | tail -1
           python3 - <<'PY'
           from zipfile import ZipFile
           with ZipFile("AstroEmpire_Android_Project.zip") as z:
-              asset=next(x for x in z.namelist() if x.endswith("/app/src/main/assets/index.html"))
-              html=z.read(asset).decode("utf-8")
-              for expected in ("aeOneFingerDrag", "ae-map-input-and-visibility-fix", "function spawnInitialScouts()", "function buildPlanets()"):
-                  assert expected in html, expected
-              print("Verified patched HTML, planets and fleet initializer.")
+            path = next(x for x in z.namelist() if x.endswith("/app/src/main/assets/index.html"))
+            s = z.read(path).decode("utf-8")
+          import subprocess
+          if 'id="ae-map-input-and-visibility-fix"' not in s:
+            subprocess.run(["python3","scripts/repair_game.py"],check=True)
           PY
-      - name: Commit repaired project archive
+          unzip -t AstroEmpire_Android_Project.zip | tail -1
+      - name: Validate restored touch support and visibility layers
+        shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add AstroEmpire_Android_Project.zip
-          git commit -m "fix: ship repaired map touch and entity visuals"
-          git push
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          with ZipFile("AstroEmpire_Android_Project.zip") as z:
+            path = next(x for x in z.namelist() if x.endswith("/app/src/main/assets/index.html"))
+            s = z.read(path).decode("utf-8")
+          required = ("aeOneFingerDrag", "#fogCanvas { opacity:.32", "#scoutLayer { z-index:42",
+                      "function spawnInitialScouts()", "function buildPlanets()")
+          for token in required:
+            assert token in s, token
+          print("All map and entity regression assertions passed")
+          PY
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+      - name: Build Android Debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p extracted-project
+          unzip -q AstroEmpire_Android_Project.zip -d extracted-project
+          SETTINGS_FILE="$(find extracted-project -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
+          test -n "$SETTINGS_FILE"
+          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
+          cd "$PROJECT_DIR"
+          if [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug
+          else
+            gradle assembleDebug
+          fi
+          cd "$GITHUB_WORKSPACE"
+          APK="$(find "$PROJECT_DIR" -type f -name '*-debug.apk' -print -quit)"
+          test -n "$APK"
+          cp "$APK" AstroEmpire-Map-Fix.apk
+          ls -lh AstroEmpire-Map-Fix.apk
+      - name: Upload repaired APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AstroEmpire-Map-Fix-APK
+          path: AstroEmpire-Map-Fix.apk
+          if-no-files-found: error
+      - name: Commit archive if modified
+        shell: bash
+        run: |
+          if ! git diff --quiet -- AstroEmpire_Android_Project.zip; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add AstroEmpire_Android_Project.zip
+            git commit -m "fix: repair AstroEmpire packaged map runtime"
+            git push
+          fi
