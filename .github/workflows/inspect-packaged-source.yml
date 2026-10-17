@@ -43,6 +43,8 @@ jobs:
           s=p.read_text(encoding="utf-8",errors="replace")
           d=Path("inspected-source/diagnostics")
           d.mkdir(parents=True,exist_ok=True)
+          for off in range(6400000,len(s),180000):
+              (d/f"game_tail_{(off-6400000)//180000:03d}.txt").write_text(s[off:off+180000],encoding="utf-8")
           lines=s.count("\\n")+1
           scripts=list(re.finditer(r"<script\\b[^>]*>(.*?)</script\\s*>",s,re.I|re.S))
           report=[f"HTML chars={len(s)} lines={lines} script_sections={len(scripts)}"]
